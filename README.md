@@ -1,6 +1,6 @@
 <div align="center">
 
-# Spec2RTL/py
+# Cirbuild-Spec2RTL/py
 
 ![Version](https://img.shields.io/badge/spec2rtl%2Fpy_ver.-V0.1-007EC6?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-4CAF50?style=for-the-badge)
@@ -80,7 +80,46 @@ spec2rtl/
 ```
 
 ### Usage
+
 Execute the pipeline via the CLI:
 ```bash
 python -m spec2rtl.pipeline --spec /path/to/spec.pdf --module my_hardware_module
 ```
+
+### Scripting Guide
+
+You can also integrate Cirbuild-Spec2RTL/py into your Python scripts for customized workflows:
+
+```python
+from spec2rtl.pipeline import run_pipeline
+from spec2rtl.config import load_config
+
+# Load configuration
+config = load_config("spec2rtl/config/default_config.yaml")
+
+# Run the hardware synthesis pipeline
+result = run_pipeline(
+    spec_path="/path/to/spec.pdf",
+    module_name="my_hardware_module",
+    config=config
+)
+
+if result.success:
+    print(f"RTL generated successfully at {result.output_dir}")
+else:
+    print("Pipeline failed. Check the logs for details.")
+```
+
+## 🔍 Interpreting Error Logs
+
+The toolchain generates detailed logs in the `logs/` directory. When an error occurs during synthesis or generation:
+*   **Module 1-3 Errors**: Typically relate to LLM misinterpretations or code extraction failures. Check `generation.log` and ensure your PDF specification is clearly formatted.
+*   **Module 4 (HLS) Errors**: These are handled by the Reflection Engine. If the system fails to recover, check `hls_synthesis.log` for the specific C++ pragma or syntax failure reported by the Google XLS or Bambu compilers.
+
+## 🐛 Bug Reports
+
+If you encounter persistent issues, unexpected crashes, or have feature requests, please report them to our development team. 
+
+📧 Email bug reports to: **cirbuild_dev@proton.me**
+
+Please include the relevant `.log` files, the configuration used, and the target hardware specification in your report.
