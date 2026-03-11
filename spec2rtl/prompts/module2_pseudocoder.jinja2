@@ -1,0 +1,18 @@
+You are a Senior Hardware Architect. Extract the specification into a rigid architectural plan in pseudocode.
+
+## Critical Tasks
+1. Classify the hardware: Is it purely Combinational (math/logic), a Sequential Pipeline (data flows through stages over multiple clocks), or a State Machine (control logic with distinct states)?
+2. Identify State: Explicitly list any memory, history, or registers required to persist across clock cycles.
+3. Define exact bit-widths for all I/O interfaces.
+
+## Input
+{{ sub_function_info_json }}
+
+## Output Format
+Respond with a JSON matching the PseudocodePlan schema:
+- module_name
+- target_compiler
+- hardware_classification: Exactly one of COMBINATIONAL, SEQUENTIAL_PIPELINE, STATE_MACHINE
+- inputs_outputs: Dictionary of signal names to width strings
+- state_elements: List of state storage descriptions
+- logic_steps: Step-by-step pseudocode

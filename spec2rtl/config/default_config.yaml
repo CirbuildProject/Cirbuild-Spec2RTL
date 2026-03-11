@@ -1,0 +1,33 @@
+# Spec2RTL Default Configuration
+# ================================
+# All values here can be overridden by environment variables
+# prefixed with SPEC2RTL_ (e.g., SPEC2RTL_DEFAULT_MODEL).
+
+# --- LLM Configuration (API-Agnostic via LiteLLM) ---
+# Model identifiers follow LiteLLM format: "provider/model-name"
+# Examples: "gemini/gemini-2.5-flash", "openai/gpt-4o",
+#           "anthropic/claude-3.5-sonnet", "ollama/llama3"
+default_model: "gemini/gemini-3-flash-preview"
+fallback_models:
+  - "gemini/gemini-2.5-flash"
+  - "gemini/gemini-2.5-flash-lite"
+  - "gemini/gemini-2.5-pro"
+max_llm_retries: 3
+llm_temperature: 0.0
+llm_max_tokens: 4096
+
+# --- Build & Output ---
+build_dir: "builds"
+
+# --- HLS Compiler Backend ---
+# Options: "google_xls", "bambu", "vitis"
+hls_compiler: "google_xls"
+xls_docker_image: "cirbuild-xls:v1"
+
+# --- Logging ---
+log_level: "INFO"
+log_dir: "logs"
+
+# --- Agent Orchestration ---
+max_agent_rounds: 20
+max_reflection_cycles: 3
