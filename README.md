@@ -2,7 +2,7 @@
 
 # Cirbuild-Spec2RTL/py
 
-![Version](https://img.shields.io/badge/spec2rtl%2Fpy_ver.-V0.1-007EC6?style=for-the-badge)
+![Version](https://img.shields.io/badge/Cirbuild--Spec2RTL%2Fpy_ver.-V0.1-007EC6?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-4CAF50?style=for-the-badge)
 ![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)
 
@@ -40,8 +40,8 @@ This software toolchain owes its foundational concepts to the original **Spec2RT
 ### 1. Clone & Setup Environment
 ```bash
 # Clone the repository
-git clone https://github.com/your-repo/spec2rtl.git
-cd spec2rtl
+git clone https://github.com/your-repo/Cirbuild-Spec2RTL.git
+cd Cirbuild-Spec2RTL
 
 # Create and activate a virtual environment
 python3 -m venv .venv
