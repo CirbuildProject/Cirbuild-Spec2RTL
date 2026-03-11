@@ -10,7 +10,7 @@
 </div>
 
 ## 📖 Overview
-Spec2RTL/py is a fully automated, agentic toolchain that accelerates hardware design by translating natural language specifications and PDF documents directly into Register Transfer Level (RTL) code. Leveraging Large Language Models (LLMs) via the AutoGen framework, this tool systematically decomposes complex specifications, generates intermediate C++ implementations, verifies functional correctness, and synthesizes the code into optimized RTL using High-Level Synthesis (HLS) constraints.
+Spec2RTL/py is a fully automated, agentic toolchain that accelerates hardware design by translating natural language specifications and PDF documents directly into Register Transfer Level (RTL) code. Leveraging Large Language Models (LLMs) via the AutoGen framework, this tool systematically decomposes complex specifications, generates intermediate C++ implementations, verifies functional correctness, and synthesizes the code into optimized RTL using High-Level Synthesis (HLS) constraints. Additionally, this project will be integrated into CirbuildSTG as a subsystem module. The /py marker is a suffix to indicate that this is a Python implementation of the Spec2RTL toolchain.
 
 ## 🏛️ Architecture
 The toolchain is divided into an intelligent, multi-stage pipeline:
@@ -27,7 +27,8 @@ The toolchain is divided into an intelligent, multi-stage pipeline:
     An advanced recovery loop that intercepts synthesis compilation failures, patches C++ code syntax or pragmas, and learns new constraints to prevent subsequent errors.
 
 ## 💡 Acknowledgments
-This software toolchain owes its foundational concepts to the original **Spec2RTL** research paper. We extend our deepest gratitude and full credit to the original authors of Spec2RTL for their pioneering contributions to LLM-driven hardware generation and automated RTL synthesis loops.
+This software toolchain owes its foundational concepts to the original 
+**Spec2RTL-Agent: Automated Hardware Code Generation from Complex Specifications Using LLM Agent Systems** (https://arxiv.org/abs/2506.13905) research paper. We extend our deepest gratitude and full credit to the original authors of Spec2RTL for their pioneering contributions to LLM-driven hardware generation and automated RTL synthesis loops.
 
 ## 🚀 Installation Guide
 
@@ -123,3 +124,11 @@ If you encounter persistent issues, unexpected crashes, or have feature requests
 📧 Email bug reports to: **cirbuild_dev@proton.me**
 
 Please include the relevant `.log` files, the configuration used, and the target hardware specification in your report.
+
+## 🔮 Future Work
+
+Future development will focus on the integration of Spec2RTL/py into **CirbuildSTG** as a subsystem module. This integration will allow the toolchain to operate directly within the broader CirbuildSTG ecosystem as a dedicated hardware synthesis component.
+
+## ⚠️ Disclaimer
+
+This project is completely written, debugged, and verified via the use of the **Antigravity** agentic IDE, utilizing models of Claude Opus 4.6 and Gemini 3.1 Pro. Any generated code through this pipeline should be manually verified before mission-critical use (e.g., research literature, commercial usage, etc.). The architectural considerations and progressive refinements are genuine human intent.
