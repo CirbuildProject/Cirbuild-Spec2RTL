@@ -129,6 +129,16 @@ Please include the relevant `.log` files, the configuration used, and the target
 
 Future development will focus on the integration of Spec2RTL/py into **CirbuildSTG** as a subsystem module. This integration will allow the toolchain to operate directly within the broader CirbuildSTG ecosystem as a dedicated hardware synthesis component.
 
+Additionally, the following enhancements are planned to improve the robustness and usability of the toolchain:
+
+*   **Agentic Memory Modules**: 
+    *   *Short-Term Memory*: Explicitly structuring conversational history to retain only the current synthesis loop's context, saving tokens and reducing iterative confusion.
+    *   *Long-Term Memory*: Implementing a lightweight, local Vector Database (e.g., ChromaDB or FAISS) to embed "Error -> Fix" generation pairs. This stateful learning capability will allow the HLS Reflection Engine to recall and apply past solutions to similar errors.
+*   **Advisor / Supervisor Agent (Human-in-the-Loop)**: Introducing an interactive pipeline intercept module. This User Proxy agent will be triggered during high-complexity outputs or unresolvable HLS errors, allowing users to pause the flow and interrogate the generated logic. This feature aims to transform the toolchain into a hands-on learning platform for IC design students.
+*   **GUI and Natural Language Translator**: 
+    *   *Web Interface*: Transitioning to a Python-native framework like Streamlit or Gradio to spin up a reactive GUI without falling into the "GUI Trap" of over-engineering heavy frontend web frameworks.
+    *   *NL Scripting Translator*: Developing an internal Python execution script translator using standard `re` libraries or AST parsing to map simple natural language commands to local execution scripts, serving as a low-latency alternative to expensive LLM API calls.
+
 ## ⚠️ Disclaimer
 
 This project is completely written, debugged, and verified via the use of the **Antigravity** agentic IDE, utilizing models of Claude Opus 4.6 and Gemini 3.1 Pro. Any generated code through this pipeline should be manually verified before mission-critical use (e.g., research literature, commercial usage, etc.). The architectural considerations and progressive refinements are genuine human intent.
