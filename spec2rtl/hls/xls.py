@@ -97,7 +97,7 @@ class XLSHLSTool(AbstractHLSTool):
         output_dir.mkdir(parents=True, exist_ok=True)
 
         ir_file = output_dir / cpp_path.with_suffix(".ir").name
-        opt_ir_file = output_dir / cpp_path.stem + "_opt.ir"
+        opt_ir_file = output_dir / f"{cpp_path.stem}_opt.ir"
         v_file = output_dir / cpp_path.with_suffix(".v").name
 
         # Resolve absolute paths for Docker volume mount

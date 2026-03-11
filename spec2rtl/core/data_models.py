@@ -244,6 +244,19 @@ class ReflectionDecision(BaseModel):
         ),
     )
 
+class HLSRecoveryPlan(BaseModel):
+    """Output from the HLS Reflection Agent (Module 4.5)."""
+
+    fixed_cpp_code: str = Field(
+        description="The fully corrected C++ code that addresses the synthesis error."
+    )
+    learned_rule: str | None = Field(
+        default=None,
+        description="A concise rule to add to the compiler constraints to prevent this error in the future."
+    )
+    reasoning: str = Field(
+        description="Explanation of the error cause and why this fix works."
+    )
 
 # ──────────────────────────────────────────────────────────────
 # Module 4: HLS Optimization

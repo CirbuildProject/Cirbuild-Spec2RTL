@@ -1,0 +1,62 @@
+
+I would like you to implement a module named TopModule with the following
+interface. All input and output ports are one bit unless otherwise
+specified.
+
+ - input  SrcA       (32 bits)
+ - input  SrcB       (32 bits)
+ - input  Operation  (4 bits)
+ - output ALUResult  (32 bits)
+
+The module should implement a combinational ALU. The 4-bit Operation input
+selects exactly one of the following operations. Unless stated otherwise,
+shift amounts are taken from the lower 5 bits of SrcB (SrcB[4:0]). For
+comparison operations, the result must be 32'd1 when the condition is true
+and 32'd0 when false.
+
+ - 4'b0000: AND
+   ALUResult = SrcA & SrcB
+
+ - 4'b0001: OR
+   ALUResult = SrcA | SrcB
+
+ - 4'b0010: ADD
+   ALUResult = SrcA + SrcB (32-bit addition)
+
+ - 4'b0011: LEFT SHIFT (logical)
+   ALUResult = SrcA << SrcB[4:0]
+
+ - 4'b0100: RIGHT SHIFT (logical)
+   ALUResult = SrcA >> SrcB[4:0] (zero-fill)
+
+ - 4'b0101: SUBTRACT
+   ALUResult = SrcA - SrcB (32-bit subtraction)
+
+ - 4'b0110: RIGHT SHIFT ARITHMETIC
+   ALUResult = $signed(SrcA) >>> SrcB[4:0]
+
+ - 4'b0111: EQUAL
+   ALUResult = (SrcA == SrcB) ? 32'd1 : 32'd0
+
+ - 4'b1000: NOT EQUAL
+   ALUResult = (SrcA != SrcB) ? 32'd1 : 32'd0
+
+ - 4'b1001: LESS THAN (signed)
+   ALUResult = ($signed(SrcA) < $signed(SrcB)) ? 32'd1 : 32'd0
+
+ - 4'b1010: GREATER OR EQUAL (signed)
+   ALUResult = ($signed(SrcA) >= $signed(SrcB)) ? 32'd1 : 32'd0
+
+ - 4'b1011: UNSIGNED LESS THAN
+   ALUResult = (SrcA < SrcB) ? 32'd1 : 32'd0
+
+ - 4'b1100: UNSIGNED GREATER OR EQUAL
+   ALUResult = (SrcA >= SrcB) ? 32'd1 : 32'd0
+
+ - 4'b1101: ALWAYS TRUE
+   ALUResult = 32'd1
+
+Inputs and outputs are purely combinational; no sequential logic is
+required.
+
+

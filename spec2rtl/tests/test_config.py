@@ -13,7 +13,7 @@ class TestSpec2RTLSettings:
     def test_default_settings_load(self) -> None:
         """Settings should load with defaults from default_config.yaml."""
         settings = Spec2RTLSettings.from_yaml()
-        assert settings.default_model == "gemini/gemini-3-flash-preview"
+        assert settings.default_model == "gemini/gemini-3.1-pro-preview"
         assert len(settings.fallback_models) >= 1
         assert settings.max_llm_retries == 3
         assert settings.llm_temperature == 0.0

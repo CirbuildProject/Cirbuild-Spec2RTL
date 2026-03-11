@@ -1,0 +1,5 @@
+.env
+builds/
+logs/
+.pytest_cache/
+.venv/

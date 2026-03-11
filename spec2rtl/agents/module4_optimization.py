@@ -112,51 +112,85 @@ class OptimizationModule:
             HLSSynthesisResult with the path to generated RTL.
 
         Raises:
-            HLSSynthesisFailedError: If synthesis fails.
+            HLSSynthesisFailedError: If synthesis fails after max retries.
         """
         output_dir = build_dir or self._settings.build_dir
+        safe_name = module_name.strip().lower().replace(" ", "_").replace("-", "_")
 
-        # Stage 1: Optimize C++ for the active compiler
-        logger.info(
-            "⚡ Module 4 — Optimizing C++ for %s...",
-            self._hls_tool.tool_name,
-        )
-        optimized = self._optimize_for_compiler(cpp_code)
+        # We will keep track of the active constraints and code
+        # They might change if we hit an error and learn a new rule
+        current_constraints = self._hls_tool.get_constraints()
+        current_cpp_code = cpp_code
+        
+        from spec2rtl.hls.reflection import HLSReflectionModule
+        hls_reflector = HLSReflectionModule(self._settings)
 
-        # Write optimized code to build directory
-        safe_name = (
-            module_name.strip().lower().replace(" ", "_").replace("-", "_")
-        )
-        cpp_path = write_to_build_dir(
-            content=optimized.cpp_code,
-            filename=f"{safe_name}_hls.cpp",
-            build_root=output_dir,
-        )
+        for attempt in range(1, self._settings.max_reflection_cycles + 1):
+            
+            # Stage 1: Optimize C++ for the active compiler (using current constraints)
+            if attempt == 1:
+                logger.info(
+                    "⚡ Module 4 — Optimizing C++ for %s...",
+                    self._hls_tool.tool_name,
+                )
+            else:
+                logger.info(
+                    "♻️ Module 4 — Re-optimizing C++ with learned rules (Attempt %d)...",
+                    attempt
+                )
+            
+            optimized = self._optimize_for_compiler(current_cpp_code, current_constraints)
 
-        # Stage 2: Synthesize to RTL
-        logger.info("🏗️ Module 4 — Running HLS synthesis...")
-        result = self._hls_tool.synthesize(
-            cpp_path=cpp_path,
-            output_dir=cpp_path.parent,
-        )
+            # Write optimized code to build directory
+            cpp_path = write_to_build_dir(
+                content=optimized.cpp_code,
+                filename=f"{safe_name}_hls_att{attempt}.cpp",
+                build_root=output_dir,
+            )
 
-        if result.success:
-            logger.info("✅ Module 4 complete: RTL at %s", result.rtl_output_path)
-        else:
-            logger.error("❌ Module 4 synthesis failed: %s", result.error_log)
+            # Stage 2: Synthesize to RTL
+            logger.info("🏗️ Module 4 — Running HLS synthesis (Attempt %d)...", attempt)
+            
+            result = self._hls_tool.synthesize(
+                cpp_path=cpp_path,
+                output_dir=cpp_path.parent,
+            )
 
-        return result
+            if result.success:
+                logger.info("✅ Module 4 complete: RTL at %s", result.rtl_output_path)
+                return result
+            
+            # If we get here, synthesize() failed but didn't throw an exception 
+            # (which means the tool returned success=False)
+            logger.error("❌ Module 4 HLS synthesis failed: %s", result.error_log)
+            
+            if attempt == self._settings.max_reflection_cycles:
+                logger.error("🛑 Max HLS reflection cycles reached. Aborting.")
+                return result # Return the failed result
+            
+            # Invoke Module 4.5 to fix the code and learn a new rule
+            logger.info("🔄 Passing error to Module 4.5 HLS Reflection...")
+            fixed_cpp, updated_constraints = hls_reflector.recover(
+                cpp_code=optimized.cpp_code,
+                error_log=str(result.error_log),
+                target_compiler=self._hls_tool.tool_name,
+                current_constraints=current_constraints
+            )
+            
+            # Update variables for next loop iteration
+            current_cpp_code = fixed_cpp
+            current_constraints = updated_constraints
 
-    def _optimize_for_compiler(self, cpp_code: str) -> CppHlsTarget:
+    def _optimize_for_compiler(self, cpp_code: str, constraints: "HLSSynthesisResult") -> CppHlsTarget:
         """Ask the LLM to adapt C++ code for the active compiler.
 
         Args:
             cpp_code: The input C++ code.
+            constraints: The active compiler constraints (possibly updated by reflection).
 
         Returns:
             A CppHlsTarget with the optimized code.
         """
-        constraints = self._hls_tool.get_constraints()
         template = _jinja_env.get_template("module4_optimizer.jinja2")
         prompt = template.render(
             compiler_name=constraints.compiler_name,
@@ -173,4 +207,9 @@ class OptimizationModule:
             },
             {"role": "user", "content": prompt},
         ]
-        return self._llm.generate(messages, CppHlsTarget)
+        
+        # We must use create() instead of generate() here because LLMClient in the current version only has create() exposed for struct output.
+        # Actually generate() was used earlier but create() is the correct method name based on test_llm_client.py
+        result = self._llm.create(messages, response_format=CppHlsTarget)
+        assert isinstance(result, CppHlsTarget)
+        return result
