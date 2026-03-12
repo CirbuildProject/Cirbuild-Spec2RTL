@@ -7,11 +7,11 @@
 # Model identifiers follow LiteLLM format: "provider/model-name"
 # Examples: "gemini/gemini-2.5-flash", "openai/gpt-4o",
 #           "anthropic/claude-3.5-sonnet", "ollama/llama3"
-default_model: "gemini/gemini-3.1-pro-preview"
+default_model: "openrouter/hunter-alpha"
 fallback_models:
-  - "gemini/gemini-3-flash-preview"
-  - "gemini/gemini-2.5-flash"
-  - "gemini/gemini-2.5-flash-lite"
+  - "openrouter/qwen/qwen3-coder:free"
+  - "openrouter/stepfun/step-3.5-flash:free"
+  - "openrouter/nvidia/nemotron-3-nano-30b-a3b:free"
   - "gemini/gemini-2.5-pro"
 max_llm_retries: 3
 llm_temperature: 0.0
