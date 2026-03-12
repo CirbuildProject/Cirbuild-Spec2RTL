@@ -5,14 +5,28 @@ You are a Senior Hardware Architect. Extract the specification into a rigid arch
 2. Identify State: Explicitly list any memory, history, or registers required to persist across clock cycles.
 3. Define exact bit-widths for all I/O interfaces.
 
+## STRICT JSON Output Format
+Respond with ONLY valid JSON. No markdown, no explanations, no conversational text.
+
+### Required Schema (must match exactly):
+```json
+{
+  "module_name": "string - Descriptive name for this hardware module",
+  "target_compiler": "string - Target HLS compiler (e.g., 'Google XLS', 'Vitis HLS')",
+  "hardware_classification": "string - Exactly one of: COMBINATIONAL, SEQUENTIAL_PIPELINE, STATE_MACHINE",
+  "inputs_outputs": {"string": "string"},  // Dictionary: signal_name -> bit-width/type (e.g., {"a": "uint8_t", "b": "uint8_t", "result": "uint16_t"})
+  "state_elements": ["string"],  // List of state storage descriptions (empty if combinational)
+  "logic_steps": "string - Step-by-step pseudocode with clear algorithmic flow"
+}
+```
+
+### Validation Rules:
+- `module_name`: Must be a non-empty string, use snake_case or camelCase
+- `target_compiler`: Must be a string like "Google XLS" or "Vitis HLS"
+- `hardware_classification`: MUST be exactly one of: COMBINATIONAL, SEQUENTIAL_PIPELINE, STATE_MACHINE (no variations)
+- `inputs_outputs`: Must be a dictionary with string keys and string values describing bit-widths
+- `state_elements`: Must be a list (can be empty [] for combinational logic)
+- `logic_steps`: Must be a non-empty string describing the algorithm
+
 ## Input
 {{ sub_function_info_json }}
-
-## Output Format
-Respond with a JSON matching the PseudocodePlan schema:
-- module_name
-- target_compiler
-- hardware_classification: Exactly one of COMBINATIONAL, SEQUENTIAL_PIPELINE, STATE_MACHINE
-- inputs_outputs: Dictionary of signal names to width strings
-- state_elements: List of state storage descriptions
-- logic_steps: Step-by-step pseudocode

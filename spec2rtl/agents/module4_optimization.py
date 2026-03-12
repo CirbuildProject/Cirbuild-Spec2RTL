@@ -17,7 +17,7 @@ from typing import Optional
 from jinja2 import Environment, FileSystemLoader
 
 from spec2rtl.config.settings import Spec2RTLSettings
-from spec2rtl.core.data_models import CppHlsTarget, HLSSynthesisResult
+from spec2rtl.core.data_models import CppHlsTarget, HLSSynthesisResult, HLSConstraints
 from spec2rtl.core.exceptions import HLSSynthesisFailedError, PipelineStageError
 from spec2rtl.hls.bambu import BambuHLSTool
 from spec2rtl.hls.base import AbstractHLSTool
@@ -181,7 +181,7 @@ class OptimizationModule:
             current_cpp_code = fixed_cpp
             current_constraints = updated_constraints
 
-    def _optimize_for_compiler(self, cpp_code: str, constraints: "HLSSynthesisResult") -> CppHlsTarget:
+    def _optimize_for_compiler(self, cpp_code: str, constraints: HLSConstraints) -> CppHlsTarget:
         """Ask the LLM to adapt C++ code for the active compiler.
 
         Args:
@@ -208,8 +208,7 @@ class OptimizationModule:
             {"role": "user", "content": prompt},
         ]
         
-        # We must use create() instead of generate() here because LLMClient in the current version only has create() exposed for struct output.
-        # Actually generate() was used earlier but create() is the correct method name based on test_llm_client.py
-        result = self._llm.create(messages, response_format=CppHlsTarget)
+        # We use generate() with structured output via Pydantic schema
+        result = self._llm.generate(messages, response_format=CppHlsTarget)
         assert isinstance(result, CppHlsTarget)
         return result

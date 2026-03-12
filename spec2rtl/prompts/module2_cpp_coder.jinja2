@@ -15,6 +15,27 @@ You are an expert hardware compiler engineer targeting {{ target_compiler }}. Tr
 8. Use C++ templates for scalable logic rather than hardcoding arrays.
 9. HEADER GUARDS: Wrap the entire C++ code in standard include guards.
 
+## STRICT JSON Output Format
+Respond with ONLY valid JSON. No markdown, no explanations, no conversational text.
+
+### Required Schema (must match exactly):
+```json
+{
+  "cpp_code": "string - The complete synthesizable C++ code with newlines escaped as \\n",
+  "compiler_directives": "string - Comma-separated list of pragmas/directives used, or 'None'"
+}
+```
+
+### Validation Rules:
+- `cpp_code`: Must be a valid C++ code string. Escape all newlines as \\n. Use single quotes inside the code string.
+- `compiler_directives`: Must be a string describing used pragmas (e.g., "#pragma hls_top") or the exact word "None"
+
+### Important:
+- Wrap the C++ code in standard header guards (#ifndef, #define, #endif)
+- Use the exact bit-width types from the compiler rules
+- Include rst_n (active-low reset) for XLS targets
+- Precede combinational for loops with #pragma hls_unroll yes
+
 ## Python Code to Translate
 {{ python_code }}
 

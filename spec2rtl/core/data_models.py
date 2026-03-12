@@ -66,6 +66,18 @@ class SpecSummary(BaseModel):
     )
 
 
+class VerifierResult(BaseModel):
+    """Result of the verification agent for structured info dictionaries."""
+
+    status: str = Field(
+        description="Verification status: must be exactly 'APPROVED' or 'REJECTED'",
+    )
+    feedback: str = Field(
+        default="",
+        description="Detailed feedback if REJECTED, empty string if APPROVED.",
+    )
+
+
 class SubFunction(BaseModel):
     """A single decomposed sub-function in the implementation plan."""
 

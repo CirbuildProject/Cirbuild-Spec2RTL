@@ -13,7 +13,28 @@ The compiler threw the following error log:
 {{ error_log }}
 </compiler_error>
 
+{% if historical_fixes %}
+### IMPORTANT: Historical Context from Previous Errors
+The system has encountered similar errors before. Review these past fixes:
+
+{{ historical_fixes }}
+
+Use these historical fixes as guidance for resolving the current error. If a similar fix strategy applies, adapt it to the current code.
+{% endif %}
+
 Analyze the error log to understand why the synthesis failed. HLS compilers are notoriously strict about C++ syntax, pragma placement, and unsupported standard library functions.
+
+## STRICT JSON Output Format
+Respond with ONLY valid JSON. No markdown, no explanations.
+
+### Required Schema:
+```json
+{
+  "fixed_cpp_code": "string - Complete corrected C++ code",
+  "learned_rule": "string or null - Generic constraint to prevent this error, or null if just a typo",
+  "reasoning": "string - Explanation of what was wrong and how it was fixed"
+}
+```
 
 Provide your analysis, the corrected code, and if this error is due to a generic compiler constraint (e.g., "pragmas must be on a separate line", "cannot use dynamic memory"), provide a concise `learned_rule` string that will be added to the prompt for future generations. If the error was just a simple typo, `learned_rule` can be null.
 

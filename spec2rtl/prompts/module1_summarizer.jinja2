@@ -14,11 +14,22 @@ You will receive a section of a hardware specification document. The section may
 3. Identify and list key parameters separately for easy reference.
 4. Flag any ambiguities or missing information that may need clarification.
 
-## Output Format
-Respond with a JSON object matching the SpecSummary schema:
-- section_title: The original section heading
-- summary: Your concise technical summary
-- key_parameters: List of important values and signal names found
+## STRICT JSON Output Format
+Respond with ONLY valid JSON. No markdown, no explanations, no conversational text.
+
+### Required Schema (must match exactly):
+```json
+{
+  "section_title": "string - The original section heading from the document",
+  "summary": "string - Your concise technical summary (max 500 chars)",
+  "key_parameters": ["string - List of important values, signal names, bit-widths, timing constraints"]
+}
+```
+
+### Validation Rules:
+- `section_title`: Must be a non-empty string
+- `summary`: Must be a string, can include technical terms and abbreviations
+- `key_parameters`: Must be a list of strings, each describing a key parameter
 
 ## Section Content
 {{ section_content }}

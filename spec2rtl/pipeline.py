@@ -191,6 +191,7 @@ class Spec2RTLPipeline:
 
         for result in results:
             if result.cpp_code is None:
+                logger.error("❌ %s has no C++ code generated - skipping verification.", result.name)
                 continue
 
             cpp_code = clean_llm_code_output(result.cpp_code.cpp_code)
@@ -255,6 +256,26 @@ class Spec2RTLPipeline:
                         result.name,
                         decision.reasoning,
                     )
+                    break
+                elif decision.chosen_path == ReflectionPath.REVISE_INSTRUCTIONS:
+                    # PATH_1: Go back to Module 1 to revise understanding
+                    logger.warning(
+                        "🔄 PATH_1: Revising specification understanding for %s",
+                        result.name,
+                    )
+                    # TODO: Implement full Module 1 re-run with specific focus on failing sub-function
+                    # For now, log and continue with best-effort
+                    logger.warning("PATH_1 not fully implemented - continuing with best-effort.")
+                    break
+                elif decision.chosen_path == ReflectionPath.FIX_PREVIOUS_SUBFUNCTIONS:
+                    # PATH_2: Re-generate previous sub-functions that caused the error
+                    logger.warning(
+                        "🔄 PATH_2: Fixing previous sub-functions for %s",
+                        result.name,
+                    )
+                    # TODO: Implement re-generation of previous sub-functions
+                    # For now, log and continue with best-effort
+                    logger.warning("PATH_2 not fully implemented - continuing with best-effort.")
                     break
                 else:
                     logger.warning(

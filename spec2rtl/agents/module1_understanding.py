@@ -25,6 +25,9 @@ from spec2rtl.core.data_models import (
 from spec2rtl.core.exceptions import PipelineStageError
 from spec2rtl.llm.llm_client import LLMClient
 from spec2rtl.utils.pdf_parser import PDFParser
+# Use the structured LLM generate method with VerifierResult schema
+from spec2rtl.core.data_models import VerifierResult
+
 
 logger = logging.getLogger("spec2rtl.agents.module1")
 
@@ -219,28 +222,18 @@ class UnderstandingModule:
                 {"role": "user", "content": prompt},
             ]
             try:
-                # The verifier responds with "APPROVED" or corrections
-                # For structured output, we re-use the LLM but check the
-                # response text rather than parsing a schema
-                from litellm import completion as raw_completion
+                
+                response = self._llm.generate(messages, response_format=VerifierResult)
+                verdict = response.status.upper() if response.status else ""
 
-                response = raw_completion(
-                    model=self._llm.default_model,
-                    messages=messages,
-                    max_tokens=2048,
-                    temperature=0.0,
-                )
-                content = response.choices[0].message.content
-                verdict = content.strip() if content else ""
-
-                if "APPROVED" in verdict.upper():
+                if "APPROVED" in verdict:
                     logger.debug("Verified: %s — APPROVED", info_dict.sub_function_name)
                     verified.append(info_dict)
                 else:
                     logger.warning(
                         "Verifier suggested corrections for %s: %s",
                         info_dict.sub_function_name,
-                        verdict[:200],
+                        response.feedback[:200] if response.feedback else "No feedback provided",
                     )
                     # Keep original for now; future: re-run descriptor
                     verified.append(info_dict)
