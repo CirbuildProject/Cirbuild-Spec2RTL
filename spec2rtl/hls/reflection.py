@@ -177,7 +177,9 @@ class HLSReflectionModule:
         if response.learned_rule:
             logger.info(f"🧠 Learned new constraint: {response.learned_rule}")
             # Add to forbidden constructs if it's a new rule
-            if hasattr(current_constraints, 'forbidden_constructs'):
-                current_constraints.forbidden_constructs.append(response.learned_rule)
+            if response.learned_rule not in current_constraints.forbidden_constructs:
+               current_constraints.forbidden_constructs.append(response.learned_rule)
+            else:
+               logger.debug("Constraint already exists in memory, skipping append.")
 
         return response.fixed_cpp_code, current_constraints
