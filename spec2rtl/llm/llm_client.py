@@ -101,20 +101,43 @@ class LLMClient:
 
         last_error: Exception | None = None
 
+        # Base messages (shallow copy of dicts) to avoid mutating caller's list
+        base_messages = [dict(m) for m in messages]
+
+        # Level 1 Defensive Programming: Aggressive System Prompt Injection
+        aggressive_prompt = (
+            "Output ONLY valid JSON. Do not include markdown formatting. "
+            "Do not include any conversational text before or after the JSON."
+        )
+        
+        prompt_injected = False
+        for msg in base_messages:
+            if msg.get("role") == "system":
+                msg["content"] = str(msg.get("content", "")) + "\n\n" + aggressive_prompt
+                prompt_injected = True
+                break
+                
+        if not prompt_injected:
+            base_messages.insert(0, {"role": "system", "content": aggressive_prompt})
+
         # --- OUTER LOOP: Model Fallback Routing ---
         for current_model in models_to_try:
             if current_model != self._active_model:
                 logger.info("🤖 [Model Active] %s", current_model)
                 self._active_model = current_model
 
+            # State for the inner loop
+            current_messages = list(base_messages)
+
             # --- INNER LOOP: JSON Formatting Retries ---
             for attempt in range(max_retries):
+                content = None
                 try:
                     response = completion(
                         model=current_model,
                         max_tokens=tokens,
                         temperature=temp,
-                        messages=messages,
+                        messages=current_messages,
                         response_format=response_format,
                     )
                     content = response.choices[0].message.content
@@ -179,6 +202,22 @@ class LLMClient:
                             f"after {max_retries} attempts on {current_model}: "
                             f"{exc}"
                         ) from exc
+                        
+                    # Feedback loop: Append error so model can correct itself
+                    raw_content = getattr(exc, "raw_response", content)
+                    if raw_content:
+                        # Append the malformed response so the model has context
+                        current_messages.append({"role": "assistant", "content": str(raw_content)})
+                    else:
+                        current_messages.append({"role": "assistant", "content": "Failed to generate valid output."})
+                        
+                    error_msg = (
+                        f"Your previous response failed validation with the following error:\n"
+                        f"{str(exc)}\n\n"
+                        f"Please fix the formatting, assure JSON correctness, and ensure "
+                        f"you strictly follow the complete {response_format.__name__} schema."
+                    )
+                    current_messages.append({"role": "user", "content": error_msg})
 
         # All models exhausted
         raise LLMRateLimitError(

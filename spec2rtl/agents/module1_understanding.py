@@ -230,7 +230,8 @@ class UnderstandingModule:
                     max_tokens=2048,
                     temperature=0.0,
                 )
-                verdict = response.choices[0].message.content.strip()
+                content = response.choices[0].message.content
+                verdict = content.strip() if content else ""
 
                 if "APPROVED" in verdict.upper():
                     logger.debug("Verified: %s — APPROVED", info_dict.sub_function_name)
