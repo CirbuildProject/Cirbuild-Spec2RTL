@@ -1,4 +1,4 @@
-# Implementation Plan v0.1: Spec2RTL/py Future Enhancements
+# Implementation Plan v0.2: Spec2RTL/py Future Enhancements
 
 This document outlines the technical design, chosen dependencies, and implementation strategy for adding stateful memory modules, a human-in-the-loop advisor agent, and a native web GUI to the Spec2RTL/py framework.
 
