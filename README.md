@@ -3,8 +3,8 @@
 # Cirbuild-Spec2RTL/py
 
 ![Version](https://img.shields.io/badge/Cirbuild--Spec2RTL%2Fpy_ver.-V0.1-007EC6?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-4CAF50?style=for-the-badge)
-![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)
+[![License](https://img.shields.io/badge/License-MIT-4CAF50?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/)
 
 **An API-Agnostic, Multi-Agent Framework for Hardware Synthesis**
 </div>
@@ -41,7 +41,7 @@ This software toolchain owes its foundational concepts to the original
 ### 1. Clone & Setup Environment
 ```bash
 # Clone the repository
-git clone https://github.com/your-repo/Cirbuild-Spec2RTL.git
+git clone https://github.com/CirbuildProject/Cirbuild-Spec2RTL.git
 cd Cirbuild-Spec2RTL
 
 # Create and activate a virtual environment
