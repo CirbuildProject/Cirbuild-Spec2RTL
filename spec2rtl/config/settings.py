@@ -124,6 +124,11 @@ class Spec2RTLSettings(BaseSettings):
             A fully resolved Spec2RTLSettings instance.
         """
         import os
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+        except ImportError:
+            pass
 
         path = config_path or _DEFAULT_CONFIG_PATH
         yaml_values = _load_yaml_config(path)

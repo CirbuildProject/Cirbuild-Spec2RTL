@@ -7,7 +7,7 @@
 # Model identifiers follow LiteLLM format: "provider/model-name"
 # Examples: "gemini/gemini-2.5-flash", "openai/gpt-4o",
 #           "anthropic/claude-3.5-sonnet", "ollama/llama3"
-default_model: "openrouter/hunter-alpha"
+default_model: "openrouter/openrouter/hunter-alpha"
 fallback_models:
   - "openrouter/qwen/qwen3-coder:free"
   - "openrouter/stepfun/step-3.5-flash:free"

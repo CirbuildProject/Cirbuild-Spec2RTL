@@ -60,6 +60,7 @@ Export your provider API keys directly to your environment:
 ```bash
 export GEMINI_API_KEY="your_api_key_here"
 export OPENAI_API_KEY="your_api_key_here"
+export OPENROUTER_API_KEY="your_api_key_here"
 ```
 
 ## 📂 Repository Guide
@@ -84,7 +85,11 @@ spec2rtl/
 
 Execute the pipeline via the CLI:
 ```bash
-python -m spec2rtl.pipeline --spec /path/to/spec.pdf --module my_hardware_module
+# Analyze a PDF specification
+python -m spec2rtl --spec /path/to/spec.pdf
+
+# Analyze a raw text specification
+python -m spec2rtl --spec /path/to/spec.txt --text
 ```
 
 ### Scripting Guide

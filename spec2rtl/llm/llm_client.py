@@ -131,9 +131,10 @@ class LLMClient:
                     RateLimitError,
                     ContextWindowExceededError,
                     APIConnectionError,
+                    litellm.exceptions.BadRequestError,
                 ) as exc:
                     logger.warning(
-                        "⚠️ [API Limit] %s on %s. Routing to fallback...",
+                        "⚠️ [API Limit / Bad Request] %s on %s. Routing to fallback...",
                         type(exc).__name__,
                         current_model,
                     )
