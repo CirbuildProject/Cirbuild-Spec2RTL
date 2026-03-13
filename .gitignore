@@ -6,3 +6,5 @@ logs/
 **/__pycache__/
 *.py[cod]
 *.bin
+*memory
+*Zone.Identifier
