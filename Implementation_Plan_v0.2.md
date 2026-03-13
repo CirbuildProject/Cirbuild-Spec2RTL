@@ -2,7 +2,7 @@
 
 This document outlines the technical design, chosen dependencies, and implementation strategy for adding stateful memory modules, a human-in-the-loop advisor agent, and a native web GUI to the Spec2RTL/py framework.
 
-## 1. Agentic Memory Modules
+## 1. Agentic Memory Modules (DONE)
 
 ### Objective
 Enhance the pipeline with statefulness to overcome context window limitations, particularly enabling the HLS Reflection Engine to learn from past compilation errors and fixes without relying on Reinforcement Learning.
