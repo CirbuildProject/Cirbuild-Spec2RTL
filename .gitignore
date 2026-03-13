@@ -9,3 +9,12 @@ logs/
 *memory/
 *Zone.Identifier
 **/hls_fixes
+
+# Python build artifacts
+build/
+dist/
+*.egg-info/
+
+# Environments
+venv/
+env/

@@ -43,7 +43,6 @@ Added automatic **combinational vs. sequential** hardware classification in Modu
 - Appropriate testbench generation
 
 ### 2. Agentic Memory Integration
-Fully implemented the "Future Work" from the paper:
 - **ChromaDB-backed long-term memory** for persistent error-fix learning
 - **Vector similarity search** to recall solutions to similar errors
 - **Learned constraints extraction** to prevent recurring issues
