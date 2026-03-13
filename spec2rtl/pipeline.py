@@ -118,9 +118,8 @@ class Spec2RTLPipeline:
         logger.info("=" * 60)
 
         # Combine all sub-function C++ into final code
-        final_cpp = self._combine_cpp(verified_results)
-
         module_name = plan.module_name
+        final_cpp = self._combine_cpp(verified_results, module_name)
         synthesis_result = self._module4.run(
             cpp_code=final_cpp,
             module_name=module_name,
@@ -160,7 +159,7 @@ class Spec2RTLPipeline:
         verified_results = self._verify_with_reflection(
             coding_results, info_dicts, compiler
         )
-        final_cpp = self._combine_cpp(verified_results)
+        final_cpp = self._combine_cpp(verified_results, plan.module_name)
 
         return self._module4.run(
             cpp_code=final_cpp,
@@ -288,18 +287,146 @@ class Spec2RTLPipeline:
         return results
 
     @staticmethod
-    def _combine_cpp(results: List[SubFunctionResult]) -> str:
+    def _combine_cpp(results: List[SubFunctionResult], spec_module_name: str = "") -> str:
         """Combine all sub-function C++ into a single source file.
+
+        Identifies the top module by finding the sub-function with highest
+        correlation to the spec-defined module name. Only that sub-function
+        keeps the #pragma hls_top annotation.
 
         Args:
             results: List of coding results with C++ code.
+            spec_module_name: The top-level module name from the spec (e.g., "ALU").
 
         Returns:
             Combined C++ source string.
         """
+        import re
+        
         parts: List[str] = []
-        for result in results:
+        
+        # Find the sub-function with highest correlation to spec module name
+        # Strategies (in order of priority):
+        # 1. Exact match with module name (e.g., "alu" -> "alu")
+        # 2. Contains module name (e.g., "alu" -> "alu_result_mux")
+        # 3. Common top function patterns (result_mux, top, main, output)
+        # 4. Fallback to first function
+        
+        top_function_idx = 0
+        best_score = -1
+        
+        # Clean spec name for comparison
+        spec_name_clean = spec_module_name.lower().replace("_", "").replace("-", "") if spec_module_name else ""
+        
+        # Common patterns for top-level functions in hardware designs
+        top_patterns = ["result_mux", "top", "main", "output", "mux", "wrapper"]
+        
+        for idx, result in enumerate(results):
+            if result.cpp_code is None:
+                continue
+                
+            func_name = result.name.lower().replace("_", "").replace("-", "")
+            score = 0
+            
+            # Strategy 1: Exact match with spec module name
+            if spec_name_clean and func_name == spec_name_clean:
+                score = 100
+            # Strategy 2: Function contains spec module name
+            elif spec_name_clean and spec_name_clean in func_name:
+                score = 80
+            # Strategy 3: Function is a common top pattern
+            elif any(pattern in func_name for pattern in top_patterns):
+                # Higher score for more specific patterns
+                for pattern in reversed(top_patterns):
+                    if pattern in func_name:
+                        score = 50 + (10 - top_patterns.index(pattern))
+                        break
+            # Strategy 4: Last function (likely the integrator/mux)
+            elif idx == len(results) - 1:
+                score = 20
+            
+            if score > best_score:
+                best_score = score
+                top_function_idx = idx
+        
+        logger.debug(
+            "Selected sub-function '%s' (index %d) as top module (score: %d)",
+            results[top_function_idx].name if results else "N/A",
+            top_function_idx,
+            best_score,
+        )
+        
+        # Now combine the code, keeping #pragma hls_top only for the top function
+        for idx, result in enumerate(results):
             if result.cpp_code is not None:
                 code = clean_llm_code_output(result.cpp_code.cpp_code)
+                
+                if "#pragma hls_top" in code:
+                    if idx == top_function_idx:
+                        # Keep #pragma hls_top for the top function
+                        # Ensure it's at the top of the function
+                        code = _ensure_toppragma(code)
+                        logger.debug(
+                            "Kept #pragma hls_top for top function: %s",
+                            result.name,
+                        )
+                    else:
+                        # Remove #pragma hls_top from non-top functions
+                        code = _remove_toppragma(code)
+                        logger.debug(
+                            "Removed #pragma hls_top from: %s",
+                            result.name,
+                        )
+                
                 parts.append(code)
-        return "\n\n".join(parts)
+        
+        combined = "\n\n".join(parts)
+        
+        # Ensure exactly one #pragma hls_top exists
+        if combined.count("#pragma hls_top") > 1:
+            combined = _ensure_single_toppragma(combined)
+        
+        return combined
+
+
+def _ensure_toppragma(code: str) -> str:
+    """Ensure #pragma hls_top is at the start of the function."""
+    lines = code.split("\n")
+    pragma_line = None
+    other_lines = []
+    
+    for line in lines:
+        if "#pragma hls_top" in line:
+            pragma_line = line
+        else:
+            other_lines.append(line)
+    
+    if pragma_line:
+        # Put pragma at the beginning
+        return pragma_line + "\n" + "\n".join(other_lines)
+    return code
+
+
+def _remove_toppragma(code: str) -> str:
+    """Remove all #pragma hls_top lines from code."""
+    lines = code.split("\n")
+    filtered = [line for line in lines if "#pragma hls_top" not in line]
+    return "\n".join(filtered)
+
+
+def _ensure_single_toppragma(code: str) -> str:
+    """Ensure only one #pragma hls_top remains (keeps first)."""
+    lines = code.split("\n")
+    final_lines = []
+    found_top = False
+    
+    for line in lines:
+        if "#pragma hls_top" in line:
+            if not found_top:
+                final_lines.append(line)
+                found_top = True
+            # Skip subsequent #pragma hls_top
+            continue
+        final_lines.append(line)
+    
+    return "\n".join(final_lines)

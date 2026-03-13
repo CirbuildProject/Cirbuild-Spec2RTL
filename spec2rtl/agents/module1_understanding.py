@@ -199,8 +199,8 @@ class UnderstandingModule:
     ) -> List[StructuredInfoDict]:
         """Run the Verifier Agent to validate each info dictionary.
 
-        Currently performs a single verification pass. If the verifier
-        rejects a dict, the original is kept and a warning is logged.
+        If the verifier rejects a dict, it is regenerated with the feedback
+        and re-verified up to max_verifier_retries times.
 
         Args:
             info_dicts: List of StructuredInfoDicts from Stage 3.
@@ -210,40 +210,100 @@ class UnderstandingModule:
             List of verified StructuredInfoDicts.
         """
         template = _jinja_env.get_template("module1_verifier.jinja2")
+        max_retries = self._settings.max_verifier_retries
         verified: List[StructuredInfoDict] = []
 
         for info_dict in info_dicts:
-            prompt = template.render(
-                info_dict_json=info_dict.model_dump_json(indent=2),
-                original_spec_text=original_text[:8000],
-            )
-            messages = [
-                {"role": "system", "content": "You are a Hardware Verification Engineer."},
-                {"role": "user", "content": prompt},
-            ]
-            try:
-                
-                response = self._llm.generate(messages, response_format=VerifierResult)
-                verdict = response.status.upper() if response.status else ""
-
-                if "APPROVED" in verdict:
-                    logger.debug("Verified: %s — APPROVED", info_dict.sub_function_name)
-                    verified.append(info_dict)
-                else:
-                    logger.warning(
-                        "Verifier suggested corrections for %s: %s",
-                        info_dict.sub_function_name,
-                        response.feedback[:200] if response.feedback else "No feedback provided",
-                    )
-                    # Keep original for now; future: re-run descriptor
-                    verified.append(info_dict)
-
-            except Exception as exc:
-                logger.warning(
-                    "Verification failed for %s: %s",
-                    info_dict.sub_function_name,
-                    exc,
+            current_dict = info_dict
+            
+            for attempt in range(1, max_retries + 1):
+                prompt = template.render(
+                    info_dict_json=current_dict.model_dump_json(indent=2),
+                    original_spec_text=original_text[:8000],
                 )
-                verified.append(info_dict)
+                messages = [
+                    {"role": "system", "content": "You are a Hardware Verification Engineer."},
+                    {"role": "user", "content": prompt},
+                ]
+                try:
+                    response = self._llm.generate(messages, response_format=VerifierResult)
+                    verdict = response.status.upper() if response.status else ""
+
+                    if "APPROVED" in verdict:
+                        logger.debug(
+                            "Verified: %s — APPROVED (attempt %d)",
+                            current_dict.sub_function_name,
+                            attempt,
+                        )
+                        verified.append(current_dict)
+                        break
+                    else:
+                        logger.warning(
+                            "Verifier rejected %s (attempt %d/%d): %s",
+                            current_dict.sub_function_name,
+                            attempt,
+                            max_retries,
+                            response.feedback[:200] if response.feedback else "No feedback provided",
+                        )
+                        
+                        # Regenerate the info_dict with feedback for next attempt
+                        if attempt < max_retries:
+                            logger.info(
+                                "Regenerating info_dict for '%s' with verifier feedback...",
+                                current_dict.sub_function_name,
+                            )
+                            current_dict = self._regenerate_info_dict(
+                                current_dict,
+                                response.feedback,
+                                original_text,
+                            )
+                        else:
+                            logger.warning(
+                                "Max verifier retries reached for '%s'. Keeping last version.",
+                                current_dict.sub_function_name,
+                            )
+                            verified.append(current_dict)
+
+                except Exception as exc:
+                    logger.warning(
+                        "Verification failed for %s: %s",
+                        current_dict.sub_function_name,
+                        exc,
+                    )
+                    verified.append(current_dict)
+                    break
 
         return verified
+
+    def _regenerate_info_dict(
+        self,
+        info_dict: StructuredInfoDict,
+        verifier_feedback: str,
+        original_text: str,
+    ) -> StructuredInfoDict:
+        """Regenerate an info_dict based on verifier feedback.
+
+        Args:
+            info_dict: The original info_dict that was rejected.
+            verifier_feedback: The feedback from the verifier explaining what needs fixing.
+            original_text: Full specification text.
+
+        Returns:
+            A new StructuredInfoDict with corrections applied.
+        """
+        template = _jinja_env.get_template("module1_descriptor.jinja2")
+        
+        prompt = template.render(
+            decomposition_plan_json=json.dumps({
+                "module_name": info_dict.sub_function_name,
+                "sub_functions": [{"name": info_dict.sub_function_name}],
+            }),
+            target_sub_function_name=info_dict.sub_function_name,
+            original_spec_text=original_text[:8000],
+            verifier_feedback=verifier_feedback,
+        )
+        messages = [
+            {"role": "system", "content": "You are a Hardware Description Engineer."},
+            {"role": "user", "content": prompt},
+        ]
+        return self._llm.generate(messages, StructuredInfoDict)

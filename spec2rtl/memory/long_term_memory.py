@@ -189,15 +189,23 @@ class LongTermMemory:
             return []
         
         try:
-            # Build where clause for filtering
+            # Build where clause for filtering using $and for multiple conditions
             where: dict[str, Any] = {}
+            conditions = []
+            
             if error_type:
-                where["error_type"] = error_type
+                conditions.append({"error_type": error_type})
             if compiler:
-                where["compiler"] = compiler
+                conditions.append({"compiler": compiler})
             
             # Only return successful fixes
-            where["success"] = True
+            conditions.append({"success": True})
+            
+            # ChromaDB requires $and operator for multiple filter conditions
+            if len(conditions) > 1:
+                where["$and"] = conditions
+            elif conditions:
+                where = conditions[0]
             
             results = self._collection.query(
                 query_texts=[error_message],

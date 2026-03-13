@@ -5,6 +5,9 @@ You will receive:
 1. The decomposition plan with all sub-functions
 2. The specific sub-function you must describe in detail
 3. The original specification text for reference
+{% if verifier_feedback %}
+4. Verifier feedback from a previous attempt that identified issues to fix
+{% endif %}
 
 ## Your Task
 Produce a complete StructuredInfoDict containing:
@@ -20,6 +23,17 @@ Produce a complete StructuredInfoDict containing:
 - Every signal must have an explicit bit-width (e.g., 'uint8', '16-bit signed')
 - State elements must specify their size and initialization values
 - If information is missing from the spec, explicitly note it as 'UNSPECIFIED'
+{% if verifier_feedback %}
+
+## Verifier Feedback (MUST ADDRESS ALL ISSUES)
+The verifier rejected the previous dictionary with these issues:
+{{ verifier_feedback }}
+
+You MUST fix all the issues mentioned above. Pay special attention to:
+1. Adding missing input/output signals
+2. Correcting signal names to match the specification
+3. Ensuring bit-widths match the original spec
+{% endif %}
 
 ## Decomposition Plan
 {{ decomposition_plan_json }}

@@ -101,6 +101,10 @@ class Spec2RTLSettings(BaseSettings):
         default=3,
         description="Maximum Module 3 reflection retry cycles.",
     )
+    max_verifier_retries: int = Field(
+        default=3,
+        description="Maximum retries when verifier rejects an info dict in Module 1.",
+    )
 
     model_config = {
         "env_prefix": "SPEC2RTL_",

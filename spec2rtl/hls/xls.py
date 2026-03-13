@@ -43,7 +43,7 @@ class XLSHLSTool(AbstractHLSTool):
     def __init__(
         self,
         docker_image: str = "cirbuild-xls:v1",
-        timeout: int = 120,
+        timeout: int | None = None,
     ) -> None:
         super().__init__(tool_name="Google XLS")
         self.docker_image = docker_image
@@ -160,12 +160,24 @@ class XLSHLSTool(AbstractHLSTool):
                 f"stderr: {exc.stderr}"
             )
             logger.error("❌ %s", error_msg)
-            raise HLSSynthesisFailedError(error_msg) from exc
+            # Return failed result instead of throwing to enable Module 4.5 reflection loop
+            return HLSSynthesisResult(
+                success=False,
+                rtl_output_path="",
+                log_summary="XLS synthesis failed.",
+                error_log=error_msg,
+            )
 
         except subprocess.TimeoutExpired as exc:
             error_msg = f"XLS synthesis timed out after {self.timeout}s"
             logger.error("❌ %s", error_msg)
-            raise HLSSynthesisFailedError(error_msg) from exc
+            # Return failed result instead of throwing to enable Module 4.5 reflection loop
+            return HLSSynthesisResult(
+                success=False,
+                rtl_output_path="",
+                log_summary="XLS synthesis timed out.",
+                error_log=error_msg,
+            )
 
     def parse_logs(self, log_path: Path) -> Dict[str, str]:
         """Parse XLS synthesis logs for error context.
