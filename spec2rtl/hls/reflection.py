@@ -183,3 +183,39 @@ class HLSReflectionModule:
                logger.debug("Constraint already exists in memory, skipping append.")
 
         return response.fixed_cpp_code, current_constraints
+
+    def get_learned_rules_summary(self, compiler_name: str) -> str:
+        """Get a summary of learned rules from long-term memory.
+        
+        Args:
+            compiler_name: The HLS compiler name (e.g., "google_xls", "bambu").
+            
+        Returns:
+            A formatted string of learned rules, or a default message if none found.
+        """
+        # Map display name to storage key
+        compiler_key = compiler_name.lower().replace(" ", "_")
+        if "google" in compiler_key or "xls" in compiler_key:
+            compiler_key = "google_xls"
+        
+        # Search for successful fixes
+        fixes = self._long_term_memory.find_similar_fixes(
+            error_message="",
+            error_type=None,
+            compiler=compiler_key,
+            n_results=5,
+        )
+        
+        if not fixes:
+            return "No previous rules learned yet."
+        
+        # Build summary from learned fixes
+        rules = []
+        for fix in fixes:
+            if fix.fix_strategy and fix.success:
+                rules.append(f"- {fix.fix_strategy}")
+        
+        if not rules:
+            return "No previous rules learned yet."
+        
+        return "## Previously Learned Rules:\n" + "\n".join(rules[:5])

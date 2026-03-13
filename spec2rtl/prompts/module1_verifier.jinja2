@@ -10,6 +10,26 @@ Review the dictionary and check for:
 3. **Consistency**: Are signal names consistent across sub-functions?
 4. **Missing Information**: Is anything marked 'UNSPECIFIED' that could be inferred?
 
+## CRITICAL Validation Checks
+
+### 1. Combinational vs Sequential
+- If the spec says "combinational", "purely combinational", or "no clock", the sub-function must have:
+  - NO state_elements (no registers, no flip-flops)
+  - NO clock or reset signals in inputs
+- If the spec says "sequential", "register", "FSM", or includes clock signals, state_elements MUST be defined
+
+### 2. Signed vs Unsigned
+- For comparison operations (LESS THAN, GREATER THAN, etc.), verify:
+  - SIGNED comparisons use signed types (int32_t) with explicit casting
+  - UNSIGNED comparisons use unsigned types (uint32_t)
+- If spec says "signed" or "$signed()", the implementation MUST use signed types
+- Check that arithmetic operations use the correct signedness
+
+### 3. Interface Compliance
+- Verify input/output names match the specification exactly
+- Verify no extra signals are added that weren't in the spec
+- Verify output signals are NOT listed as inputs (common hallucination)
+
 ## STRICT JSON Output Format
 Respond with ONLY valid JSON. No markdown, no explanations, no conversational text.
 
@@ -32,6 +52,12 @@ Respond with ONLY valid JSON. No markdown, no explanations, no conversational te
 ```
 ```json
 {"status": "REJECTED", "feedback": "Missing output signal 'result_valid' - inferred from spec as 1-bit bool"}
+```
+```json
+{"status": "REJECTED", "feedback": "Sequential logic detected but spec says 'purely combinational' - remove state_elements and clock/reset"}
+```
+```json
+{"status": "REJECTED", "feedback": "Unsigned comparison used for signed operation - must cast to int32_t before comparison"}
 ```
 
 ## Structured Info Dictionary

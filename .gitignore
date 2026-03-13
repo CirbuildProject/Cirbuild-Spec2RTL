@@ -6,6 +6,6 @@ logs/
 **/__pycache__/
 *.py[cod]
 *.bin
-*memory
+*memory/
 *Zone.Identifier
-*hls_fixes
+**/hls_fixes

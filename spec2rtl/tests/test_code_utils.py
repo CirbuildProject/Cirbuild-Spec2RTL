@@ -1,9 +1,8 @@
 """Unit tests for code utility functions."""
 
 import tempfile
+import unittest
 from pathlib import Path
-
-import pytest
 
 from spec2rtl.utils.code_utils import (
     clean_llm_code_output,
@@ -12,76 +11,74 @@ from spec2rtl.utils.code_utils import (
 )
 
 
-class TestCleanLLMCodeOutput:
+class TestCleanLLMCodeOutput(unittest.TestCase):
     """Tests for stripping markdown fences and normalizing newlines."""
 
     def test_strips_markdown_fence(self) -> None:
         raw = '```cpp\nint main() { return 0; }\n```'
         result = clean_llm_code_output(raw)
-        assert "```" not in result
-        assert "int main()" in result
+        self.assertNotIn("```", result)
+        self.assertIn("int main()", result)
 
     def test_strips_python_fence(self) -> None:
         raw = '```python\ndef foo(): pass\n```'
         result = clean_llm_code_output(raw)
-        assert "```" not in result
-        assert "def foo()" in result
+        self.assertNotIn("```", result)
+        self.assertIn("def foo()", result)
 
     def test_normalizes_escaped_newlines(self) -> None:
         raw = 'int a = 1;\\nint b = 2;'
         result = clean_llm_code_output(raw)
-        assert "\\n" not in result
-        assert "\n" in result
+        self.assertNotIn("\\n", result)
+        self.assertIn("\n", result)
 
     def test_no_fences_unchanged(self) -> None:
         raw = "int x = 42;"
         result = clean_llm_code_output(raw)
-        assert result == raw
+        self.assertEqual(result, raw)
 
     def test_strips_whitespace(self) -> None:
         raw = "  \n  int x;  \n  "
         result = clean_llm_code_output(raw)
-        assert result == "int x;"
+        self.assertEqual(result, "int x;")
 
 
-class TestPatchXLSHeaders:
+class TestPatchXLSHeaders(unittest.TestCase):
     """Tests for Google XLS header patching."""
 
     def test_removes_cstdint(self) -> None:
         code = '#include <cstdint>\nuint8_t x;'
         result = patch_xls_headers(code)
-        assert "#include <cstdint>" not in result
+        self.assertNotIn("#include <cstdint>", result)
 
     def test_removes_stdint_h(self) -> None:
         code = '#include <stdint.h>\nint8_t x;'
         result = patch_xls_headers(code)
-        assert "#include <stdint.h>" not in result
+        self.assertNotIn("#include <stdint.h>", result)
 
     def test_replaces_uint8(self) -> None:
         code = "uint8_t data_in;"
         result = patch_xls_headers(code)
-        assert result == "unsigned char data_in;"
+        self.assertEqual(result, "unsigned char data_in;")
 
     def test_replaces_uint16(self) -> None:
         code = "uint16_t value;"
         result = patch_xls_headers(code)
-        assert result == "unsigned short value;"
+        self.assertEqual(result, "unsigned short value;")
 
     def test_replaces_int32(self) -> None:
         code = "int32_t accumulator;"
         result = patch_xls_headers(code)
-        assert result == "int accumulator;"
+        self.assertEqual(result, "int accumulator;")
 
     def test_word_boundary_safety(self) -> None:
         """Must not replace partial matches like 'my_uint8_t_val'."""
         code = "unsigned char my_uint8_t_val;"
         result = patch_xls_headers(code)
-        # The word 'uint8_t' embedded inside the variable name should not be changed
-        # but since it matches the word boundary regex, the variable name stays
-        assert "unsigned char" in result
+        self.assertIn("unsigned char", result)
 
 
-class TestWriteToBuildDir:
+class TestWriteToBuildDir(unittest.TestCase):
     """Tests for sandboxed file output."""
 
     def test_creates_directory_and_file(self) -> None:
@@ -92,9 +89,9 @@ class TestWriteToBuildDir:
                 build_root=Path(tmp),
                 run_id="test_run",
             )
-            assert path.exists()
-            assert path.read_text() == "test content"
-            assert "test_run" in str(path)
+            self.assertTrue(path.exists())
+            self.assertEqual(path.read_text(), "test content")
+            self.assertIn("test_run", str(path))
 
     def test_auto_timestamp_run_id(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -103,8 +100,8 @@ class TestWriteToBuildDir:
                 filename="out.v",
                 build_root=Path(tmp),
             )
-            assert path.exists()
-            assert "run_" in str(path.parent.name)
+            self.assertTrue(path.exists())
+            self.assertIn("run_", str(path.parent.name))
 
     def test_idempotent_writes(self) -> None:
         """Writing the same content twice to the same run_id should
@@ -112,4 +109,9 @@ class TestWriteToBuildDir:
         with tempfile.TemporaryDirectory() as tmp:
             p1 = write_to_build_dir("abc", "f.txt", Path(tmp), "run1")
             p2 = write_to_build_dir("abc", "f.txt", Path(tmp), "run1")
-            assert p1.read_text() == p2.read_text() == "abc"
+            self.assertEqual(p1.read_text(), p2.read_text())
+            self.assertEqual(p1.read_text(), "abc")
+
+
+if __name__ == "__main__":
+    unittest.main()

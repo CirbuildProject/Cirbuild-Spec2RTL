@@ -1,6 +1,6 @@
 """Unit tests for Pydantic data models."""
 
-import pytest
+import unittest
 
 from spec2rtl.core.data_models import (
     CppHlsTarget,
@@ -17,7 +17,7 @@ from spec2rtl.core.data_models import (
 )
 
 
-class TestSpecSummary:
+class TestSpecSummary(unittest.TestCase):
     """Tests for the SpecSummary model."""
 
     def test_valid_summary(self) -> None:
@@ -26,15 +26,15 @@ class TestSpecSummary:
             summary="8-bit unsigned input, 8-bit unsigned output",
             key_parameters=["data_in: 8-bit", "data_out: 8-bit"],
         )
-        assert summary.section_title == "I/O Interface"
-        assert len(summary.key_parameters) == 2
+        self.assertEqual(summary.section_title, "I/O Interface")
+        self.assertEqual(len(summary.key_parameters), 2)
 
     def test_default_key_parameters(self) -> None:
         summary = SpecSummary(section_title="Test", summary="Test summary")
-        assert summary.key_parameters == []
+        self.assertEqual(summary.key_parameters, [])
 
 
-class TestDecompositionPlan:
+class TestDecompositionPlan(unittest.TestCase):
     """Tests for the DecompositionPlan model."""
 
     def test_valid_plan(self) -> None:
@@ -50,9 +50,9 @@ class TestDecompositionPlan:
             ],
             hardware_classification=HardwareClassification.SEQUENTIAL_PIPELINE,
         )
-        assert plan.module_name == "FIR Filter"
-        assert len(plan.sub_functions) == 1
-        assert plan.hardware_classification == HardwareClassification.SEQUENTIAL_PIPELINE
+        self.assertEqual(plan.module_name, "FIR Filter")
+        self.assertEqual(len(plan.sub_functions), 1)
+        self.assertEqual(plan.hardware_classification, HardwareClassification.SEQUENTIAL_PIPELINE)
 
     def test_serialization_roundtrip(self) -> None:
         plan = DecompositionPlan(
@@ -62,10 +62,10 @@ class TestDecompositionPlan:
         )
         json_str = plan.model_dump_json()
         restored = DecompositionPlan.model_validate_json(json_str)
-        assert restored.module_name == plan.module_name
+        self.assertEqual(restored.module_name, plan.module_name)
 
 
-class TestReflectionDecision:
+class TestReflectionDecision(unittest.TestCase):
     """Tests for the ReflectionDecision model."""
 
     def test_valid_decision(self) -> None:
@@ -75,8 +75,8 @@ class TestReflectionDecision:
             error_source="C++ type casting",
             target_sub_function="accumulator",
         )
-        assert decision.chosen_path == ReflectionPath.RETRY_CURRENT
-        assert decision.target_sub_function == "accumulator"
+        self.assertEqual(decision.chosen_path, ReflectionPath.RETRY_CURRENT)
+        self.assertEqual(decision.target_sub_function, "accumulator")
 
     def test_human_intervention_no_target(self) -> None:
         decision = ReflectionDecision(
@@ -84,10 +84,10 @@ class TestReflectionDecision:
             reasoning="Cannot determine error source",
             error_source="Unknown",
         )
-        assert decision.target_sub_function is None
+        self.assertIsNone(decision.target_sub_function)
 
 
-class TestPseudocodePlan:
+class TestPseudocodePlan(unittest.TestCase):
     """Tests for the PseudocodePlan model."""
 
     def test_with_state_elements(self) -> None:
@@ -99,7 +99,7 @@ class TestPseudocodePlan:
             state_elements=["history[4]: 8-bit unsigned array"],
             logic_steps="1. Shift data\n2. Sum\n3. Divide by 4",
         )
-        assert len(plan.state_elements) == 1
+        self.assertEqual(len(plan.state_elements), 1)
 
     def test_combinational_no_state(self) -> None:
         plan = PseudocodePlan(
@@ -109,4 +109,8 @@ class TestPseudocodePlan:
             inputs_outputs={"a": "8-bit", "b": "8-bit", "sum": "9-bit"},
             logic_steps="sum = a + b",
         )
-        assert plan.state_elements == []
+        self.assertEqual(plan.state_elements, [])
+
+
+if __name__ == "__main__":
+    unittest.main()

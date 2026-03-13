@@ -40,6 +40,7 @@ _jinja_env = Environment(
 )
 
 # Compiler-specific rule sets for C++ code generation
+# Note: rst_n should only be added for sequential designs, not combinational
 _COMPILER_RULES: Dict[str, str] = {
     "google_xls": """
 [GOOGLE XLS SPECIFIC RULES]
@@ -48,9 +49,9 @@ _COMPILER_RULES: Dict[str, str] = {
 3. Use exactly one `#pragma hls_top` before the top-level evaluation function.
 4. NO SYSTEM HEADERS: DO NOT use ANY #include directives (NO #include <cstdint>).
 5. Use native C++ built-in types: unsigned char (8-bit), unsigned short (16-bit), unsigned int (32-bit), bool.
-6. Always include an explicit active-low reset signal (rst_n) in the top-level function.
-7. LOOP PRAGMAS: Precede combinational `for` loops with `#pragma hls_unroll yes`.
-8. PASS BY REFERENCE: Pass the state struct by reference into the top-level function.
+6. Only add rst_n (active-low reset) for SEQUENTIAL designs with registers.
+7. For COMBINATIONAL designs: NO clock, NO reset, NO rst_n.
+8. LOOP PRAGMAS: Precede combinational `for` loops with `#pragma hls_unroll yes`.
 """,
     "vitis": """
 [VITIS HLS SPECIFIC RULES]

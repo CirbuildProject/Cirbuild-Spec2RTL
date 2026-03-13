@@ -1,14 +1,14 @@
 """Unit tests for the PDF parser utility."""
 
+import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 from spec2rtl.utils.pdf_parser import PDFParser
 from spec2rtl.core.exceptions import PDFParsingError
 
 
-class TestPDFParser:
+class TestPDFParser(unittest.TestCase):
     """Tests for the multimodal PDF parser."""
 
     @patch("spec2rtl.utils.pdf_parser.pdfium.PdfDocument")
@@ -39,9 +39,9 @@ class TestPDFParser:
             mock_exists.return_value = True
             result = parser.extract_text(Path("dummy.pdf"))
         
-        assert len(result) == 2
-        assert result[0] == "Page 1 Content"
-        assert result[1] == "Page 2 Content"
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0], "Page 1 Content")
+        self.assertEqual(result[1], "Page 2 Content")
 
     @patch("spec2rtl.utils.pdf_parser.pdfium.PdfDocument")
     def test_extract_text_file_not_found(self, mock_pdf_document: MagicMock) -> None:
@@ -51,5 +51,9 @@ class TestPDFParser:
         parser = PDFParser()
         with patch.object(Path, 'exists') as mock_exists:
             mock_exists.return_value = True
-            with pytest.raises(PDFParsingError):
+            with self.assertRaises(PDFParsingError):
                 parser.extract_text(Path("missing.pdf"))
+
+
+if __name__ == "__main__":
+    unittest.main()

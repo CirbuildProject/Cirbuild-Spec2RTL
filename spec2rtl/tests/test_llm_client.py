@@ -1,11 +1,12 @@
 """Unit tests for the LiteLLM API-agnostic client."""
 
+import unittest
 from unittest.mock import MagicMock, patch
 
-import pytest
+from pydantic import BaseModel
+
 from spec2rtl.core.exceptions import LLMFormattingError, LLMRateLimitError
 from spec2rtl.llm.llm_client import LLMClient
-from pydantic import BaseModel
 
 
 class PointModel(BaseModel):
@@ -13,7 +14,7 @@ class PointModel(BaseModel):
     y: int
 
 
-class TestLLMClient:
+class TestLLMClient(unittest.TestCase):
     """Tests for dual-loop robustness inside LLMClient."""
 
     @patch("spec2rtl.llm.llm_client.completion")
@@ -29,13 +30,11 @@ class TestLLMClient:
 
         client = LLMClient(settings=MagicMock(default_model="test/model", fallback_models=[]))
         
-        # Notice LLMClient calls `response_format.model_validate_json()`
-        # We can just let PointModel validate the mocked string '{"x": 10, "y": 20}' naturally!
         result = client.generate(messages=[{"role": "user", "content": "hello"}], response_format=PointModel)
 
-        assert isinstance(result, PointModel)
-        assert result.x == 10
-        assert result.y == 20
+        self.assertIsInstance(result, PointModel)
+        self.assertEqual(result.x, 10)
+        self.assertEqual(result.y, 20)
 
     @patch("spec2rtl.llm.llm_client.completion")
     def test_fallback_routing_on_rate_limit(self, mock_completion: MagicMock) -> None:
@@ -57,8 +56,8 @@ class TestLLMClient:
         client = LLMClient(settings=MagicMock(default_model="test/fail", fallback_models=["test/success"]))
         result = client.generate(messages=[{"role": "user", "content": "hi"}], response_format=PointModel)
 
-        assert mock_completion.call_count == 2
-        assert isinstance(result, PointModel)
+        self.assertEqual(mock_completion.call_count, 2)
+        self.assertIsInstance(result, PointModel)
 
     @patch("spec2rtl.llm.llm_client.completion")
     def test_formatting_retry_on_bad_json(self, mock_completion: MagicMock) -> None:
@@ -83,5 +82,9 @@ class TestLLMClient:
         client = LLMClient(settings=settings)
         result = client.generate(messages=[{"role": "user", "content": "hi"}], response_format=PointModel)
 
-        assert mock_completion.call_count == 2
-        assert isinstance(result, PointModel)
+        self.assertEqual(mock_completion.call_count, 2)
+        self.assertIsInstance(result, PointModel)
+
+
+if __name__ == "__main__":
+    unittest.main()

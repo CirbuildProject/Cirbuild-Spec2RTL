@@ -100,6 +100,7 @@ class OptimizationModule:
         cpp_code: str,
         module_name: str,
         build_dir: Path | None = None,
+        is_combinational: bool = True,
     ) -> HLSSynthesisResult:
         """Execute the full Module 4 pipeline.
 
@@ -107,6 +108,7 @@ class OptimizationModule:
             cpp_code: The C++ code to optimize and synthesize.
             module_name: Name for file naming purposes.
             build_dir: Output directory. Uses settings default if None.
+            is_combinational: Whether the design is combinational (no clock/reset).
 
         Returns:
             HLSSynthesisResult with the path to generated RTL.
@@ -139,7 +141,7 @@ class OptimizationModule:
                     attempt
                 )
             
-            optimized = self._optimize_for_compiler(current_cpp_code, current_constraints)
+            optimized = self._optimize_for_compiler(current_cpp_code, current_constraints, is_combinational)
 
             # Write optimized code to build directory
             cpp_path = write_to_build_dir(
@@ -181,21 +183,34 @@ class OptimizationModule:
             current_cpp_code = fixed_cpp
             current_constraints = updated_constraints
 
-    def _optimize_for_compiler(self, cpp_code: str, constraints: HLSConstraints) -> CppHlsTarget:
+    def _optimize_for_compiler(self, cpp_code: str, constraints: HLSConstraints, is_combinational: bool = True) -> CppHlsTarget:
         """Ask the LLM to adapt C++ code for the active compiler.
 
         Args:
             cpp_code: The input C++ code.
             constraints: The active compiler constraints (possibly updated by reflection).
+            is_combinational: Whether the design is combinational (no clock/reset).
 
         Returns:
             A CppHlsTarget with the optimized code.
         """
         template = _jinja_env.get_template("module4_optimizer.jinja2")
+        
+        # Get learned rules from reflection module if available
+        learned_rules = "No previous rules learned yet."
+        try:
+            from spec2rtl.hls.reflection import HLSReflectionModule
+            reflector = HLSReflectionModule(self._settings)
+            learned_rules = reflector.get_learned_rules_summary(constraints.compiler_name)
+        except Exception:
+            pass
+        
         prompt = template.render(
             compiler_name=constraints.compiler_name,
             constraints_json=constraints.model_dump_json(indent=2),
+            learned_rules=learned_rules,
             input_cpp_code=cpp_code,
+            is_combinational=is_combinational,
         )
         messages = [
             {
