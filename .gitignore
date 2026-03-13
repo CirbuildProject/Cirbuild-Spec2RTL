@@ -3,5 +3,5 @@ builds/
 logs/
 .pytest_cache/
 .venv/
-__pycache__/
+spec2rtl/__pycache__/
 *.pyc
