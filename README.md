@@ -76,7 +76,16 @@ The toolchain is divided into an intelligent, multi-stage pipeline:
 *   Docker (if using the Google XLS HLS backend container)
 *   HLS Compilers (e.g., Google XLS, Bambu)
 
-### 1. Clone & Setup Environment
+### Option 1: Install via pip (Recommended)
+```bash
+# Install directly from GitHub
+pip install git+https://github.com/CirbuildProject/Cirbuild-Spec2RTL.git
+
+# Or install in editable mode for development
+pip install -e git+https://github.com/CirbuildProject/Cirbuild-Spec2RTL.git
+```
+
+### Option 2: Manual Setup
 ```bash
 # Clone the repository
 git clone https://github.com/CirbuildProject/Cirbuild-Spec2RTL.git
@@ -88,7 +97,10 @@ source .venv/bin/activate
 
 # Install dependencies (ensure pip is updated)
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install -e .
+
+# Install dev dependencies for running tests
+pip install -e ".[dev]"
 ```
 
 ### 2. Configuration & API Keys
@@ -124,7 +136,10 @@ spec2rtl/
 
 Execute the pipeline via the CLI:
 ```bash
-# Analyze a PDF specification
+# Using the spec2rtl command (after pip install)
+spec2rtl --spec /path/to/spec.pdf
+
+# Or using Python module syntax
 python -m spec2rtl --spec /path/to/spec.pdf
 
 # Analyze a raw text specification
