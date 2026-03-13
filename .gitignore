@@ -3,5 +3,6 @@ builds/
 logs/
 .pytest_cache/
 .venv/
-spec2rtl/__pycache__/
-*.pyc
+**/__pycache__/
+*.py[cod]
+*.bin
