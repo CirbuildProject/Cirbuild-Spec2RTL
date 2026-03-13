@@ -8,3 +8,4 @@ logs/
 *.bin
 *memory
 *Zone.Identifier
+*hls_fixes
