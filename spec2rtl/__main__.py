@@ -56,6 +56,11 @@ def main() -> int:
         action="store_true",
         help="Treat the --spec file as raw text instead of a PDF.",
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Treat the --spec file as a JSON specification object.",
+    )
 
     args = parser.parse_args()
 
@@ -70,6 +75,13 @@ def main() -> int:
             spec_text = args.spec.read_text(encoding="utf-8")
             result = pipeline.run_from_text(
                 spec_text=spec_text,
+                target_compiler=args.compiler,
+            )
+        elif args.json:
+            import json as json_module
+            spec_json = json_module.loads(args.spec.read_text(encoding="utf-8"))
+            result = pipeline.run_from_json(
+                spec_json=spec_json,
                 target_compiler=args.compiler,
             )
         else:

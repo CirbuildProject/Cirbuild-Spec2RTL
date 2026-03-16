@@ -184,6 +184,62 @@ class Spec2RTLPipeline:
             is_combinational=is_combinational,
         )
 
+    def run_from_json(
+        self,
+        spec_json: dict,
+        target_compiler: str | None = None,
+    ) -> HLSSynthesisResult:
+        """Execute the pipeline from a JSON specification object.
+
+        Converts the structured JSON into a text representation
+        and delegates to run_from_text(). This enables programmatic
+        invocation from the Cirbuild agent client.
+
+        Args:
+            spec_json: Dictionary with keys: module_name, description,
+                inputs, outputs, behavior, constraints, classification.
+            target_compiler: Override the configured compiler.
+
+        Returns:
+            HLSSynthesisResult with the path to generated RTL.
+        """
+        spec_text = self._json_to_spec_text(spec_json)
+        return self.run_from_text(spec_text, target_compiler)
+
+    @staticmethod
+    def _json_to_spec_text(spec_json: dict) -> str:
+        """Convert a JSON spec dict into a natural-language spec string.
+
+        Handles the Hardware Classification explicitly so the backend
+        uses the correct prompts for COMBINATIONAL vs SEQUENTIAL designs.
+        """
+        parts = []
+        parts.append(f"Module Name: {spec_json.get('module_name', 'Unknown')}")
+        parts.append(f"\nDescription:\n{spec_json.get('description', '')}")
+
+        if inputs := spec_json.get("inputs"):
+            parts.append("\nInputs:")
+            for name, desc in inputs.items():
+                parts.append(f"  - {name}: {desc}")
+
+        if outputs := spec_json.get("outputs"):
+            parts.append("\nOutputs:")
+            for name, desc in outputs.items():
+                parts.append(f"  - {name}: {desc}")
+
+        if behavior := spec_json.get("behavior"):
+            parts.append(f"\nBehavior:\n{behavior}")
+
+        if constraints := spec_json.get("constraints"):
+            parts.append("\nConstraints:")
+            for c in constraints:
+                parts.append(f"  - {c}")
+
+        if classification := spec_json.get("classification"):
+            parts.append(f"\nHardware Classification: {classification}")
+
+        return "\n".join(parts)
+
     def _verify_with_reflection(
         self,
         results: List[SubFunctionResult],
