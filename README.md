@@ -104,9 +104,29 @@ pip install -e ".[dev]"
 ```
 
 ### 2. Configuration & API Keys
-Spec2RTL/py relies on [`litellm`](https://docs.litellm.ai/docs/) to remain completely API-agnostic. You can define your default target models inside `spec2rtl/config/default_config.yaml` or via environment variables.
+Spec2RTL/py relies on [`litellm`](https://docs.litellm.ai/docs/) to remain completely API-agnostic. You can define your default target models inside `spec2rtl/config/default_config.yaml` or via environment variables(.env).
 
+### 3. Set up the Google XLS Docker Environment
 
+CirbuildSTG uses a containerized Google XLS toolchain for High-Level Synthesis (HLS) to save you from compiling the tools from source. You **must** have Docker installed and running before starting the pipeline. 
+
+Choose **one** of the following methods to get the required `cirbuild-xls:v1` image:
+
+#### Option A: Pull the Pre-built Image (Fastest)
+If you just want to run the pipeline immediately, you can download the pre-compiled image directly from Docker Hub and tag it for local use:
+```bash
+# Pull the image from Docker Hub 
+docker cirbuildproject/cirbuild-xls:v1
+
+# Tag it so the CirbuildSTG backend can find it automatically
+docker tag cirbuildproject/cirbuild-xls:v1 cirbuild-xls:v1
+```
+#### Option B: Build Directly from Source (For Developers)
+If you prefer complete transparency or want to modify the XLS environment, you can build the image directly using the Dockerfile included in this repository. (Note: This process takes about 15-20 minutes upto a few hours as it compiles Google XLS via Bazel, depending on the hardware you are working on).
+```bash
+# Run this from the root of the CirbuildSTG directory
+docker build -t cirbuild-xls:v1 .
+```
 
 ---
 
