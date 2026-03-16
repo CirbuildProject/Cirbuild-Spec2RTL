@@ -304,6 +304,10 @@ class HLSSynthesisResult(BaseModel):
     success: bool = Field(
         description="Whether the synthesis completed successfully.",
     )
+    module_name: str = Field(
+        default="unknown_module",
+        description="Name of the generated module."
+    )
     rtl_output_path: Optional[str] = Field(
         default=None,
         description="Path to the generated RTL file, if successful.",

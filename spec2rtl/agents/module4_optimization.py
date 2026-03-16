@@ -158,6 +158,8 @@ class OptimizationModule:
                 output_dir=cpp_path.parent,
             )
 
+            result.module_name = module_name
+
             if result.success:
                 logger.info("✅ Module 4 complete: RTL at %s", result.rtl_output_path)
                 return result
