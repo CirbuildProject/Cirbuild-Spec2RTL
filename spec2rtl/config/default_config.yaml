@@ -23,7 +23,7 @@ build_dir: "builds"
 # --- HLS Compiler Backend ---
 # Options: "google_xls", "bambu", "vitis"
 hls_compiler: "google_xls"
-xls_docker_image: "cirbuild-xls:v1"
+xls_docker_image: "cirbuildproject/cirbuild-xls:v1"
 
 # --- Logging ---
 log_level: "INFO"
