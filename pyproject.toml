@@ -34,3 +34,6 @@ spec2rtl = "spec2rtl.__main__:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["spec2rtl*"]
+
+[tool.setuptools.package-data]
+spec2rtl = ["prompts/*.jinja2", "config/*.yaml"]

@@ -10,6 +10,7 @@ Anthropic, Google, local Ollama, etc.) — controlled purely by config.
 """
 
 import logging
+import os
 from typing import List, Type, TypeVar
 
 import litellm
@@ -56,6 +57,35 @@ class LLMClient:
     def __init__(self, settings: Spec2RTLSettings | None = None) -> None:
         self._settings = settings or Spec2RTLSettings.from_yaml()
         self._active_model: str | None = None
+
+    @staticmethod
+    def _resolve_api_key(model: str) -> str | None:
+        """Resolve the correct API key for a given model string.
+
+        Inspects the model prefix to select the appropriate provider key
+        from the environment. This allows the pipeline to use different
+        providers for primary and fallback models without coupling to a
+        single API key, preventing rate-limit conflicts between providers.
+
+        Key environment variables (set in .env):
+            SPEC2RTL_OPENROUTER_KEY  — for ``openrouter/`` models
+            SPEC2RTL_GEMINI_KEY      — for ``gemini/`` models
+            SPEC2RTL_ANTHROPIC_KEY   — for ``anthropic/`` models
+
+        Args:
+            model: LiteLLM model string (e.g. ``openrouter/minimax/minimax-m2.5``).
+
+        Returns:
+            The resolved API key string, or None if no matching key is set.
+        """
+        if model.startswith("gemini/"):
+            return os.environ.get("SPEC2RTL_GEMINI_KEY")
+        if model.startswith("anthropic/"):
+            return os.environ.get("SPEC2RTL_ANTHROPIC_KEY")
+        if model.startswith("openrouter/"):
+            return os.environ.get("SPEC2RTL_OPENROUTER_KEY")
+        # Unknown provider prefix — let LiteLLM fall back to its own env detection
+        return None
 
     @property
     def default_model(self) -> str:
@@ -135,6 +165,7 @@ class LLMClient:
                 try:
                     response = completion(
                         model=current_model,
+                        api_key=self._resolve_api_key(current_model),
                         max_tokens=tokens,
                         temperature=temp,
                         messages=current_messages,

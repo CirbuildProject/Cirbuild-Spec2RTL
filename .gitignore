@@ -19,3 +19,5 @@ dist/
 venv/
 env/
 Verilog_sample/
+
+clean_codebase_spec2rtl.txt

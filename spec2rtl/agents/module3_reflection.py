@@ -153,11 +153,15 @@ class ReflectionModule:
             {"role": "user", "content": prompt},
         ]
 
-        # Use raw completion for the analysis (free-form text output)
+        # Use raw completion for the analysis (free-form text output).
+        # Inject the provider-specific API key so the correct key is used
+        # even when the active model differs from the default.
         from litellm import completion as raw_completion
 
+        active_model = self._llm.default_model
         response = raw_completion(
-            model=self._llm.default_model,
+            model=active_model,
+            api_key=self._llm._resolve_api_key(active_model),
             messages=messages,
             max_tokens=2048,
             temperature=0.0,

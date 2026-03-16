@@ -106,12 +106,66 @@ pip install -e ".[dev]"
 ### 2. Configuration & API Keys
 Spec2RTL/py relies on [`litellm`](https://docs.litellm.ai/docs/) to remain completely API-agnostic. You can define your default target models inside `spec2rtl/config/default_config.yaml` or via environment variables.
 
-Export your provider API keys directly to your environment:
+
+
+---
+
+### Using .env File for Configuration
+
+For convenience, you can configure Spec2RTL using a `.env` file. When Spec2RTL is used as a dependency (e.g., within CirbuildSTG), it will automatically load the `.env` from the current working directory.
+
+Spec2RTL uses **provider-specific API keys** so that primary and fallback models can use different providers without rate-limit conflicts. The correct key is selected automatically based on the model string prefix before each API call.
+
+#### How Key Selection Works
+
+| Model prefix | Key used |
+|---|---|
+| `openrouter/...` | `SPEC2RTL_OPENROUTER_KEY` |
+| `gemini/...` | `SPEC2RTL_GEMINI_KEY` |
+| `anthropic/...` | `SPEC2RTL_ANTHROPIC_KEY` |
+
+This means if your primary model is `openrouter/minimax/minimax-m2.5` and your fallback is `gemini/gemini-2.5-flash`, the pipeline will automatically use `SPEC2RTL_OPENROUTER_KEY` for the primary call and `SPEC2RTL_GEMINI_KEY` for the fallback — no extra configuration needed.
+
+#### Quick Setup (for standalone usage)
+
 ```bash
-export GEMINI_API_KEY="your_api_key_here"
-export OPENAI_API_KEY="your_api_key_here"
-export OPENROUTER_API_KEY="your_api_key_here"
+# Create a .env file in your project root
+cat > .env << 'EOF'
+# Provider API Keys — set only the ones you need
+SPEC2RTL_OPENROUTER_KEY="sk-or-v1-your-openrouter-key-here"
+SPEC2RTL_GEMINI_KEY="AIza-your-gemini-key-here"       # optional: only if using gemini/ fallback
+SPEC2RTL_ANTHROPIC_KEY="sk-ant-your-anthropic-key-here" # optional: only if using anthropic/ fallback
+
+# Model Selection (optional)
+SPEC2RTL_DEFAULT_MODEL="openrouter/minimax/minimax-m2.5"
+
+# HLS Compiler (optional)
+SPEC2RTL_HLS_COMPILER="google_xls"
+EOF
 ```
+
+#### Configuration Priority
+
+Configuration is resolved in this priority order:
+1. **Environment variables** (`.env` file) ← Use this for API keys
+2. **YAML config file** (`spec2rtl/config/default_config.yaml`)
+3. **Code defaults**
+
+#### All Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `SPEC2RTL_OPENROUTER_KEY` | Yes* | — | API key for `openrouter/` models |
+| `SPEC2RTL_GEMINI_KEY` | Yes* | — | API key for `gemini/` models (Google AI Studio) |
+| `SPEC2RTL_ANTHROPIC_KEY` | Yes* | — | API key for `anthropic/` models |
+| `SPEC2RTL_DEFAULT_MODEL` | No | `openrouter/minimax/minimax-m2.5` | Primary LLM model |
+| `SPEC2RTL_HLS_COMPILER` | No | `google_xls` | HLS compiler |
+| `SPEC2RTL_BUILD_DIR` | No | `builds` | Output directory |
+| `SPEC2RTL_LOG_LEVEL` | No | `INFO` | Logging level |
+
+> * At minimum, set the key for your primary model's provider. Set additional keys only if you configure fallback models from other providers.
+
+> **Note:** For advanced customization (fallback models, retry counts, etc.), edit `spec2rtl/config/default_config.yaml` directly.
 
 ## 📂 Repository Guide
 

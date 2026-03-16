@@ -42,14 +42,12 @@ class Spec2RTLSettings(BaseSettings):
 
     # --- LLM Configuration (API-Agnostic) ---
     default_model: str = Field(
-        default="gemini/gemini-3-flash-preview",
+        default="openrouter/minimax/minimax-m2.5",
         description="Primary LLM model identifier in LiteLLM format.",
     )
     fallback_models: List[str] = Field(
         default_factory=lambda: [
-            "gemini/gemini-2.5-flash",
-            "gemini/gemini-2.5-flash-lite",
-            "gemini/gemini-2.5-pro",
+            "openrouter/gemini/gemini-2.5-flash",
         ],
         description="Ordered list of fallback model identifiers.",
     )
