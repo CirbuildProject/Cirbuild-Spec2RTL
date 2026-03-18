@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spec2rtl"
-version = "0.1.0"
+version = "0.1.1"
 description = "Spec-to-RTL translation tool using LLM-based HLS pipeline"
 readme = "README.md"
 requires-python = ">=3.8"
