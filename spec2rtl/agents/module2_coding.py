@@ -321,6 +321,41 @@ class ProgressiveCodingModule:
         except subprocess.TimeoutExpired:
             return "ERROR: Syntax check timed out after 30s"
 
+    @staticmethod
+    def logical_verify(cpp_path: Path, tb_path: Path, build_dir: Path) -> tuple[bool, str]:
+        """
+        Compile the C++ code with its testbench and execute it to verify logical correctness.
+        Returns a tuple of (Success Boolean, Output/Error Log).
+        """
+        binary_path = build_dir / f"{cpp_path.stem}_tb_bin"
+        
+        try:
+            # 1. Compile C++ and Testbench together
+            subprocess.run(
+                ["g++", str(cpp_path), str(tb_path), "-o", str(binary_path)],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=30,
+            )
+            
+            # 2. Execute the compiled testbench
+            exec_proc = subprocess.run(
+                [str(binary_path)],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=30,
+            )
+            return True, exec_proc.stdout
+
+        except subprocess.CalledProcessError as exc:
+            # Captures compilation errors, linking errors, or assertion failures during execution
+            error_msg = exc.stderr if exc.stderr else exc.stdout
+            return False, f"Logical Verification Failed:\n{error_msg}"
+        except subprocess.TimeoutExpired:
+            return False, "Logical Verification Failed: Execution timed out after 30s."
+
     def fix_compilation_error(
         self,
         bad_code: str,

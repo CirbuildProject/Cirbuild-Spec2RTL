@@ -8,7 +8,7 @@ logs/
 *.bin
 *memory/
 *Zone.Identifier
-**/hls_fixes
+**hls_fixes/
 
 # Python build artifacts
 build/
@@ -19,5 +19,6 @@ dist/
 venv/
 env/
 Verilog_sample/
-
+clean_prompt_spec2rtl.txt
 clean_codebase_spec2rtl.txt
+

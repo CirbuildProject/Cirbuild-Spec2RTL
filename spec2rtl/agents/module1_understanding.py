@@ -5,7 +5,7 @@ step-by-step implementation plans using a multi-agent workflow.
 
 Datapath: Raw Spec → Summaries → Decomposed Sub-Functions → Structured Info Dict
 
-Uses AutoGen v0.5 AssistantAgent and RoundRobinGroupChat for orchestration.
+Uses Custom, sequential, schema-driven, deterministic agentic pipeline.
 Prompts are loaded from Jinja2 templates in the prompts/ directory.
 """
 
@@ -89,11 +89,11 @@ class UnderstandingModule:
 
         # Stage 3: Build structured info dictionaries
         logger.info("📋 Module 1 — Stage 3: Building structured info dicts...")
-        info_dicts = self._describe_sub_functions(plan, full_text)
+        info_dicts = self._describe_sub_functions(plan, full_text, summaries)
 
         # Stage 4: Verify each info dict
         logger.info("✅ Module 1 — Stage 4: Verifying structured info dicts...")
-        verified_dicts = self._verify_info_dicts(info_dicts, full_text)
+        verified_dicts = self._verify_info_dicts(plan, info_dicts, full_text, summaries)
 
         logger.info(
             "Module 1 complete: %d sub-functions planned.",
@@ -163,6 +163,7 @@ class UnderstandingModule:
         self,
         plan: DecompositionPlan,
         original_text: str,
+        summaries: List[SpecSummary], 
     ) -> List[StructuredInfoDict]:
         """Run the Description Agent on each sub-function.
 
@@ -175,12 +176,14 @@ class UnderstandingModule:
         """
         template = _jinja_env.get_template("module1_descriptor.jinja2")
         info_dicts: List[StructuredInfoDict] = []
+        summaries_json = json.dumps([s.model_dump() for s in summaries], indent=2)
 
         for sub_func in plan.sub_functions:
             prompt = template.render(
                 decomposition_plan_json=plan.model_dump_json(indent=2),
                 target_sub_function_name=sub_func.name,
                 original_spec_text=original_text[:8000],
+                summaries_json=summaries_json,
             )
             messages = [
                 {"role": "system", "content": "You are a Hardware Description Engineer."},
@@ -194,8 +197,10 @@ class UnderstandingModule:
 
     def _verify_info_dicts(
         self,
+        plan: DecompositionPlan,
         info_dicts: List[StructuredInfoDict],
         original_text: str,
+        summaries: List[SpecSummary],
     ) -> List[StructuredInfoDict]:
         """Run the Verifier Agent to validate each info dictionary.
 
@@ -219,6 +224,7 @@ class UnderstandingModule:
             for attempt in range(1, max_retries + 1):
                 prompt = template.render(
                     info_dict_json=current_dict.model_dump_json(indent=2),
+                    decomposition_plan_json=plan.model_dump_json(indent=2),
                     original_spec_text=original_text[:8000],
                 )
                 messages = [
@@ -256,6 +262,8 @@ class UnderstandingModule:
                                 current_dict,
                                 response.feedback,
                                 original_text,
+                                plan,
+                                summaries,
                             )
                         else:
                             logger.warning(
@@ -280,6 +288,8 @@ class UnderstandingModule:
         info_dict: StructuredInfoDict,
         verifier_feedback: str,
         original_text: str,
+        plan: DecompositionPlan,
+        summaries: List[SpecSummary],
     ) -> StructuredInfoDict:
         """Regenerate an info_dict based on verifier feedback.
 
@@ -292,14 +302,14 @@ class UnderstandingModule:
             A new StructuredInfoDict with corrections applied.
         """
         template = _jinja_env.get_template("module1_descriptor.jinja2")
+        summaries_json = json.dumps([s.model_dump() for s in summaries], indent=2)
         
         prompt = template.render(
-            decomposition_plan_json=json.dumps({
-                "module_name": info_dict.sub_function_name,
-                "sub_functions": [{"name": info_dict.sub_function_name}],
-            }),
+            decomposition_plan_json=plan.model_dump_json(indent=2),
+            info_dict_json=current_dict.model_dump_json(indent=2),
             target_sub_function_name=info_dict.sub_function_name,
             original_spec_text=original_text[:8000],
+            summaries_json=summaries_json,
             verifier_feedback=verifier_feedback,
         )
         messages = [

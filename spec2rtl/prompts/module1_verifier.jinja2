@@ -30,6 +30,10 @@ Review the dictionary and check for:
 - Verify no extra signals are added that weren't in the spec
 - Verify output signals are NOT listed as inputs (common hallucination)
 
+###4. The Anti-Hallucination Rule
+- The Description Agent must NOT invent signals, ports, or state elements that are not explicitly requested or strictly implied by the provided specification.
+- If the info dictionary contains standard interface signals (e.g., AXI-Stream tvalid/tready, or standard clk/rst) that are absent or not mentioned from the original text, you MUST reject it and instruct the agent to remove them.
+
 ## STRICT JSON Output Format
 Respond with ONLY valid JSON. No markdown, no explanations, no conversational text.
 
@@ -65,3 +69,6 @@ Respond with ONLY valid JSON. No markdown, no explanations, no conversational te
 
 ## Original Specification
 {{ original_spec_text }}
+
+## Decomposition Plan
+{{ decomposition_plan_json }}

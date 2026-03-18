@@ -5,8 +5,10 @@ You will receive:
 1. The decomposition plan with all sub-functions
 2. The specific sub-function you must describe in detail
 3. The original specification text for reference
+4. Summaries of the original specification from summarizer
 {% if verifier_feedback %}
-4. Verifier feedback from a previous attempt that identified issues to fix
+5. The previous info_dict that was rejected
+6. Verifier feedback from a previous attempt that identified issues to fix
 {% endif %}
 
 ## Your Task
@@ -24,6 +26,9 @@ Produce a complete StructuredInfoDict containing:
 - State elements must specify their size and initialization values
 - If information is missing from the spec, explicitly note it as 'UNSPECIFIED'
 {% if verifier_feedback %}
+
+## Previous Attempt
+{{info_dict_json}}
 
 ## Verifier Feedback (MUST ADDRESS ALL ISSUES)
 The verifier rejected the previous dictionary with these issues:
@@ -43,3 +48,6 @@ You MUST fix all the issues mentioned above. Pay special attention to:
 
 ## Original Specification
 {{ original_spec_text }}
+
+## Summaries
+{{ summaries_json }}
