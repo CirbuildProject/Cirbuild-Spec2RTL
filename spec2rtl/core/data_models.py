@@ -89,15 +89,23 @@ class SubFunction(BaseModel):
     )
     inputs: Dict[str, str] = Field(
         default_factory=dict,
-        description="Input signal names mapped to their bit-widths/types.",
+        description="Input signal names mapped to their bit-widths/types (e.g., {'data_in': 'uint8_t'}).",
     )
     outputs: Dict[str, str] = Field(
         default_factory=dict,
-        description="Output signal names mapped to their bit-widths/types.",
+        description="Output signal names mapped to their bit-widths/types (e.g., {'result': 'uint32_t'}).",
     )
     dependencies: List[str] = Field(
         default_factory=list,
         description="Names of other sub-functions this depends on.",
+    )
+    is_top_module: bool = Field(
+        default=False,
+        description=(
+            "True if this sub-function is the top-level hardware module entry point. "
+            "Exactly ONE sub-function in the plan MUST have this set to true. "
+            "This is used for deterministic #pragma hls_top insertion."
+        ),
     )
 
 
@@ -106,6 +114,13 @@ class DecompositionPlan(BaseModel):
 
     module_name: str = Field(
         description="Top-level hardware module name.",
+    )
+    top_module_name: str = Field(
+        default="",
+        description=(
+            "The name of the sub-function designated as the top-level hardware module. "
+            "Must match the 'name' field of exactly one SubFunction with is_top_module=true."
+        ),
     )
     sub_functions: List[SubFunction] = Field(
         description="Sequential list of sub-functions to implement.",

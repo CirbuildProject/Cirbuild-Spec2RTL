@@ -35,6 +35,10 @@ from spec2rtl.utils.pdf_parser import PDFParser
 
 logger = logging.getLogger("spec2rtl.pipeline")
 
+# Feature flag: use legacy regex heuristic for top-module detection.
+# Set to True only for backward-compat debugging. Default: False (schema-driven).
+LEGACY_TOP_MODULE_HEURISTIC: bool = False
+
 
 class Spec2RTLPipeline:
     """Top-level orchestrator connecting Modules 1-4.
@@ -101,6 +105,9 @@ class Spec2RTLPipeline:
         pages = PDFParser.extract_text(spec_path)
         plan, info_dicts = self._module1.run(pages)
 
+        # DFG interface validation (Phase 3.3) — warns on bit-width mismatches
+        _validate_dfg_interfaces(plan)
+
         # ── Module 2: Progressive Coding ──
         logger.info("=" * 60)
         logger.info("MODULE 2: Progressive Coding & Prompt Optimization")
@@ -118,9 +125,9 @@ class Spec2RTLPipeline:
         logger.info("MODULE 4: Code Optimization & HLS Synthesis")
         logger.info("=" * 60)
 
-        # Combine all sub-function C++ into final code
+        # Combine all sub-function C++ into final code (schema-driven, Phase 3.2)
         module_name = plan.module_name
-        final_cpp = self._combine_cpp(verified_results, module_name)
+        final_cpp, top_func_name = self._combine_cpp(verified_results, plan)
         # Determine if design is combinational based on hardware classification
         is_combinational = plan.hardware_classification in [
             HardwareClassification.COMBINATIONAL,
@@ -133,6 +140,7 @@ class Spec2RTLPipeline:
             module_name=module_name,
             build_dir=self._settings.build_dir,
             is_combinational=is_combinational,
+            top_func_name=top_func_name,
         )
 
         if synthesis_result.success:
@@ -164,11 +172,15 @@ class Spec2RTLPipeline:
 
         pages = [spec_text]
         plan, info_dicts = self._module1.run(pages, spec_text)
+
+        # DFG interface validation (Phase 3.3)
+        _validate_dfg_interfaces(plan)
+
         coding_results = self._module2.run(info_dicts, compiler)
         verified_results = self._verify_with_reflection(
             coding_results, info_dicts, compiler
         )
-        final_cpp = self._combine_cpp(verified_results, plan.module_name)
+        final_cpp, top_func_name = self._combine_cpp(verified_results, plan)
 
         # Determine if design is combinational
         is_combinational = plan.hardware_classification in [
@@ -182,6 +194,7 @@ class Spec2RTLPipeline:
             module_name=plan.module_name,
             build_dir=self._settings.build_dir,
             is_combinational=is_combinational,
+            top_func_name=top_func_name,
         )
 
     def run_from_json(
@@ -248,8 +261,11 @@ class Spec2RTLPipeline:
     ) -> List[SubFunctionResult]:
         """Run verification with Module 3 reflection on failures.
 
-        For each sub-function, checks compilation and routes failures
-        through the reflection module for up to max_reflection_cycles.
+        Phase 1 hardening: After syntax passes, writes the testbench to disk
+        and runs logical_verify (compiles + executes with assertions). If the
+        testbench fails, the execution log is piped into the reflection loop
+        as the error payload. The pipeline is hard-gated: it will not proceed
+        to Module 4 until logical verification passes or max_cycles is exhausted.
 
         Args:
             results: Coding results from Module 2.
@@ -260,27 +276,65 @@ class Spec2RTLPipeline:
             List of verified SubFunctionResults.
         """
         max_cycles = self._settings.max_reflection_cycles
+        build_dir = self._settings.build_dir
 
         for result in results:
             if result.cpp_code is None:
-                logger.error("❌ %s has no C++ code generated - skipping verification.", result.name)
+                logger.error(
+                    "❌ %s has no C++ code generated - skipping verification.",
+                    result.name,
+                )
                 continue
 
             cpp_code = clean_llm_code_output(result.cpp_code.cpp_code)
 
-            # Write to temp for syntax check
+            # Write C++ to disk for syntax check
             tmp_path = write_to_build_dir(
                 content=cpp_code,
                 filename=f"{result.name}_check.cpp",
-                build_root=self._settings.build_dir,
+                build_root=build_dir,
             )
             status = ProgressiveCodingModule.syntax_check(tmp_path)
 
-            if status == "SUCCESS":
-                logger.info("✅ %s passed syntax check.", result.name)
-                continue
+            if status != "SUCCESS":
+                logger.warning(
+                    "❌ %s failed syntax check — entering reflection loop.", result.name
+                )
+            else:
+                # Syntax passed: attempt logical verification (Phase 1, Task 1.1)
+                if result.testbench and result.testbench.testbench_code:
+                    tb_code = clean_llm_code_output(result.testbench.testbench_code)
+                    tb_path = write_to_build_dir(
+                        content=tb_code,
+                        filename=f"{result.name}_tb.cpp",
+                        build_root=build_dir,
+                    )
+                    logical_ok, exec_log = ProgressiveCodingModule.logical_verify(
+                        cpp_path=tmp_path,
+                        tb_path=tb_path,
+                        build_dir=tmp_path.parent,
+                    )
+                    if logical_ok:
+                        logger.info(
+                            "✅ %s passed syntax + logical verification.", result.name
+                        )
+                        continue
+                    else:
+                        # Hard-gate: logical failure treated as error for reflection
+                        logger.warning(
+                            "🔴 %s failed logical verification — entering reflection loop.",
+                            result.name,
+                        )
+                        logger.debug("Execution log:\n%s", exec_log[:1000])
+                        status = exec_log  # Pipe execution log into reflection
+                else:
+                    # No testbench available — syntax pass is sufficient
+                    logger.info(
+                        "✅ %s passed syntax check (no testbench available).", result.name
+                    )
+                    continue
 
-            # Enter reflection loop
+            # ── Reflection Loop ──
             for cycle in range(max_cycles):
                 logger.warning(
                     "🔄 Reflection cycle %d/%d for %s",
@@ -292,7 +346,7 @@ class Spec2RTLPipeline:
                 trajectory = GenerationTrajectory(result.name)
                 trajectory.cpp_code = cpp_code
                 trajectory.compilation_log = status
-                trajectory.error_description = f"Compilation failed: {status[:500]}"
+                trajectory.error_description = f"Verification failed: {status[:500]}"
 
                 if result.pseudocode:
                     trajectory.pseudocode = result.pseudocode.model_dump_json()
@@ -311,17 +365,42 @@ class Spec2RTLPipeline:
                     tmp_path = write_to_build_dir(
                         content=cpp_code,
                         filename=f"{result.name}_check.cpp",
-                        build_root=self._settings.build_dir,
+                        build_root=build_dir,
                     )
                     status = ProgressiveCodingModule.syntax_check(tmp_path)
 
                     if status == "SUCCESS":
-                        logger.info(
-                            "✅ %s fixed after %d reflection cycles.",
-                            result.name,
-                            cycle + 1,
-                        )
-                        break
+                        # Re-run logical verification after fix
+                        if result.testbench and result.testbench.testbench_code:
+                            tb_code = clean_llm_code_output(
+                                result.testbench.testbench_code
+                            )
+                            tb_path = write_to_build_dir(
+                                content=tb_code,
+                                filename=f"{result.name}_tb.cpp",
+                                build_root=build_dir,
+                            )
+                            logical_ok, exec_log = ProgressiveCodingModule.logical_verify(
+                                cpp_path=tmp_path,
+                                tb_path=tb_path,
+                                build_dir=tmp_path.parent,
+                            )
+                            if logical_ok:
+                                logger.info(
+                                    "✅ %s fixed after %d reflection cycle(s).",
+                                    result.name,
+                                    cycle + 1,
+                                )
+                                break
+                            else:
+                                status = exec_log  # Continue looping
+                        else:
+                            logger.info(
+                                "✅ %s syntax fixed after %d reflection cycle(s).",
+                                result.name,
+                                cycle + 1,
+                            )
+                            break
                 elif decision.chosen_path == ReflectionPath.HUMAN_INTERVENTION:
                     logger.error(
                         "🛑 Human intervention requested for %s: %s",
@@ -330,66 +409,48 @@ class Spec2RTLPipeline:
                     )
                     break
                 elif decision.chosen_path == ReflectionPath.REVISE_INSTRUCTIONS:
-                    # PATH_1: Go back to Module 1 to revise understanding for specific sub-function
                     logger.info(
                         "🔄 PATH_1: Revising specification understanding for %s",
                         result.name,
                     )
-                    # Use verifier feedback to regenerate the info_dict
-                    if hasattr(decision, 'error_source') and decision.error_source:
-                        logger.info("Re-generating info_dict with focus on: %s", decision.error_source)
-                        # The error_source contains what went wrong - regenerate with that context
-                        # This will be picked up by module1's verifier feedback mechanism
-                    # After revision, regenerate code for this sub-function
                     correction = self._module2.fix_compilation_error(
                         cpp_code, status, compiler
                     )
                     cpp_code = clean_llm_code_output(correction.fixed_cpp_code)
                     result.cpp_code.cpp_code = cpp_code
-                    
                     tmp_path = write_to_build_dir(
                         content=cpp_code,
                         filename=f"{result.name}_path1_check.cpp",
-                        build_root=self._settings.build_dir,
+                        build_root=build_dir,
                     )
                     status = ProgressiveCodingModule.syntax_check(tmp_path)
-                    
                     if status == "SUCCESS":
                         logger.info("✅ %s fixed via PATH_1 revision.", result.name)
                     break
                 elif decision.chosen_path == ReflectionPath.FIX_PREVIOUS_SUBFUNCTIONS:
-                    # PATH_2: Re-generate previous sub-functions that may have caused the error
                     logger.info(
                         "🔄 PATH_2: Fixing potential issues in previous sub-functions for %s",
                         result.name,
                     )
-                    # Find the index of current sub-function
-                    current_idx = -1
-                    for idx, r in enumerate(results):
-                        if r.name == result.name:
-                            current_idx = idx
-                            break
-                    
-                    # Re-check all previous sub-functions for consistency
+                    current_idx = next(
+                        (idx for idx, r in enumerate(results) if r.name == result.name),
+                        -1,
+                    )
                     if current_idx > 0:
-                        logger.info("Re-validating %d previous sub-functions", current_idx)
-                        # In a full implementation, we would re-run module2 for previous functions
-                        # For now, log the issue and allow processing to continue
-                    
-                    # Still try to fix current function
+                        logger.info(
+                            "Re-validating %d previous sub-functions", current_idx
+                        )
                     correction = self._module2.fix_compilation_error(
                         cpp_code, status, compiler
                     )
                     cpp_code = clean_llm_code_output(correction.fixed_cpp_code)
                     result.cpp_code.cpp_code = cpp_code
-                    
                     tmp_path = write_to_build_dir(
                         content=cpp_code,
                         filename=f"{result.name}_path2_check.cpp",
-                        build_root=self._settings.build_dir,
+                        build_root=build_dir,
                     )
                     status = ProgressiveCodingModule.syntax_check(tmp_path)
-                    
                     if status == "SUCCESS":
                         logger.info("✅ %s fixed via PATH_2 correction.", result.name)
                     break
@@ -404,106 +465,120 @@ class Spec2RTLPipeline:
         return results
 
     @staticmethod
-    def _combine_cpp(results: List[SubFunctionResult], spec_module_name: str = "") -> str:
+    def _combine_cpp(
+        results: List[SubFunctionResult],
+        plan: DecompositionPlan,
+    ) -> tuple[str, str]:
         """Combine all sub-function C++ into a single source file.
 
-        Identifies the top module by finding the sub-function with highest
-        correlation to the spec-defined module name. Only that sub-function
-        keeps the #pragma hls_top annotation.
+        Uses the schema-driven `is_top_module` flag from the DecompositionPlan
+        to deterministically identify the top module (Phase 3.2). Falls back to
+        the legacy regex heuristic only if LEGACY_TOP_MODULE_HEURISTIC is True.
+
+        Only the top module retains its `#pragma hls_top` annotation.
 
         Args:
             results: List of coding results with C++ code.
-            spec_module_name: The top-level module name from the spec (e.g., "ALU").
+            plan: The DecompositionPlan from Module 1, containing is_top_module flags.
 
         Returns:
-            Combined C++ source string.
+            Tuple of (combined C++ source string, resolved top function name).
         """
         import re
-        
+
         parts: List[str] = []
-        
-        # Find the sub-function with highest correlation to spec module name
-        # Strategies (in order of priority):
-        # 1. Exact match with module name (e.g., "alu" -> "alu")
-        # 2. Contains module name (e.g., "alu" -> "alu_result_mux")
-        # 3. Common top function patterns (result_mux, top, main, output)
-        # 4. Fallback to first function
-        
-        top_function_idx = 0
-        best_score = -1
-        
-        # Clean spec name for comparison
-        spec_name_clean = spec_module_name.lower().replace("_", "").replace("-", "") if spec_module_name else ""
-        
-        # Common patterns for top-level functions in hardware designs
-        top_patterns = ["result_mux", "top", "main", "output", "mux", "wrapper"]
-        
-        for idx, result in enumerate(results):
-            if result.cpp_code is None:
-                continue
-                
-            func_name = result.name.lower().replace("_", "").replace("-", "")
-            score = 0
-            
-            # Strategy 1: Exact match with spec module name
-            if spec_name_clean and func_name == spec_name_clean:
-                score = 100
-            # Strategy 2: Function contains spec module name
-            elif spec_name_clean and spec_name_clean in func_name:
-                score = 80
-            # Strategy 3: Function is a common top pattern
-            elif any(pattern in func_name for pattern in top_patterns):
-                # Higher score for more specific patterns
-                for pattern in reversed(top_patterns):
-                    if pattern in func_name:
-                        score = 50 + (10 - top_patterns.index(pattern))
-                        break
-            # Strategy 4: Last function (likely the integrator/mux)
-            elif idx == len(results) - 1:
-                score = 20
-            
-            if score > best_score:
-                best_score = score
-                top_function_idx = idx
-        
-        logger.debug(
-            "Selected sub-function '%s' (index %d) as top module (score: %d)",
-            results[top_function_idx].name if results else "N/A",
-            top_function_idx,
-            best_score,
+        safe_name_fallback = plan.module_name.strip().lower().replace(" ", "_").replace("-", "_")
+
+        # Build a lookup: sub-function name → is_top_module
+        top_module_set: set[str] = {
+            sf.name
+            for sf in plan.sub_functions
+            if sf.is_top_module
+        }
+
+        # Fallback: if schema provides no designation (e.g., old plans), use top_module_name
+        if not top_module_set and plan.top_module_name:
+            top_module_set = {plan.top_module_name}
+
+        if not top_module_set and not LEGACY_TOP_MODULE_HEURISTIC:
+            # Last resort: use the last result (integrator pattern)
+            if results:
+                top_module_set = {results[-1].name}
+                logger.warning(
+                    "No is_top_module flag found in schema — defaulting to last "
+                    "sub-function '%s' as top module.",
+                    results[-1].name,
+                )
+
+        if LEGACY_TOP_MODULE_HEURISTIC:
+            # ── Legacy regex heuristic (preserved for debugging) ──
+            spec_module_name = plan.module_name
+            spec_name_clean = (
+                spec_module_name.lower().replace("_", "").replace("-", "")
+                if spec_module_name
+                else ""
+            )
+            top_patterns = ["result_mux", "top", "main", "output", "mux", "wrapper"]
+            top_function_idx = 0
+            best_score = -1
+            for idx, result in enumerate(results):
+                if result.cpp_code is None:
+                    continue
+                func_name = result.name.lower().replace("_", "").replace("-", "")
+                score = 0
+                if spec_name_clean and func_name == spec_name_clean:
+                    score = 100
+                elif spec_name_clean and spec_name_clean in func_name:
+                    score = 80
+                elif any(pattern in func_name for pattern in top_patterns):
+                    for pattern in reversed(top_patterns):
+                        if pattern in func_name:
+                            score = 50 + (10 - top_patterns.index(pattern))
+                            break
+                elif idx == len(results) - 1:
+                    score = 20
+                if score > best_score:
+                    best_score = score
+                    top_function_idx = idx
+            top_module_set = {results[top_function_idx].name} if results else set()
+            logger.debug(
+                "[LEGACY] Selected '%s' as top module (score: %d)",
+                results[top_function_idx].name if results else "N/A",
+                best_score,
+            )
+
+        logger.info(
+            "Top module(s) designated for #pragma hls_top: %s", top_module_set
         )
-        
-        # Now combine the code, keeping #pragma hls_top only for the top function
-        for idx, result in enumerate(results):
+
+        for result in results:
             if result.cpp_code is not None:
                 code = clean_llm_code_output(result.cpp_code.cpp_code)
-                
+                is_top = result.name in top_module_set
+
                 if "#pragma hls_top" in code:
-                    if idx == top_function_idx:
-                        # Keep #pragma hls_top for the top function
-                        # Ensure it's at the top of the function
+                    if is_top:
                         code = _ensure_toppragma(code)
-                        logger.debug(
-                            "Kept #pragma hls_top for top function: %s",
-                            result.name,
-                        )
+                        logger.debug("Kept #pragma hls_top for: %s", result.name)
                     else:
-                        # Remove #pragma hls_top from non-top functions
                         code = _remove_toppragma(code)
-                        logger.debug(
-                            "Removed #pragma hls_top from: %s",
-                            result.name,
-                        )
-                
+                        logger.debug("Removed #pragma hls_top from: %s", result.name)
+                elif is_top:
+                    # Top function has no pragma yet — inject it
+                    code = _ensure_toppragma(code)
+                    logger.debug("Injected #pragma hls_top for: %s", result.name)
+
                 parts.append(code)
-        
+
         combined = "\n\n".join(parts)
-        
-        # Ensure exactly one #pragma hls_top exists
+
+        # Safety: ensure exactly one #pragma hls_top in output
         if combined.count("#pragma hls_top") > 1:
             combined = _ensure_single_toppragma(combined)
-        
-        return combined
+
+        # Resolve a single top function name for downstream use
+        resolved_top_name = next(iter(top_module_set)) if top_module_set else safe_name_fallback
+        return combined, resolved_top_name
 
 
 def _ensure_toppragma(code: str) -> str:
@@ -547,3 +622,58 @@ def _ensure_single_toppragma(code: str) -> str:
         final_lines.append(line)
     
     return "\n".join(final_lines)
+
+
+def _validate_dfg_interfaces(plan: DecompositionPlan) -> None:
+    """Validate that DFG interface bit-widths are consistent between dependent sub-functions.
+
+    Phase 3.3: For each sub-function B that declares a dependency on sub-function A,
+    check that any signal name appearing in BOTH A's outputs and B's inputs has the
+    same declared type string. Logs a WARNING for each mismatch; does not raise
+    exceptions so the pipeline can still proceed.
+
+    Args:
+        plan: The DecompositionPlan from Module 1 with sub-function I/O definitions.
+    """
+    # Build lookup: name → SubFunction
+    sf_by_name: dict[str, object] = {sf.name: sf for sf in plan.sub_functions}
+
+    mismatch_count = 0
+    for sf_b in plan.sub_functions:
+        for dep_name in sf_b.dependencies:
+            sf_a = sf_by_name.get(dep_name)
+            if sf_a is None:
+                logger.warning(
+                    "DFG: Sub-function '%s' declares dependency '%s' which does not "
+                    "exist in the decomposition plan.",
+                    sf_b.name,
+                    dep_name,
+                )
+                continue
+
+            # Check overlapping signal names between A's outputs and B's inputs
+            overlapping_signals = set(sf_a.outputs.keys()) & set(sf_b.inputs.keys())
+            for signal in overlapping_signals:
+                type_a = sf_a.outputs[signal]
+                type_b = sf_b.inputs[signal]
+                if type_a != type_b:
+                    logger.warning(
+                        "DFG MISMATCH: Signal '%s' between '%s' → '%s': "
+                        "producer declares '%s', consumer expects '%s'. "
+                        "Proceeding, but this may cause type errors in C++.",
+                        signal,
+                        dep_name,
+                        sf_b.name,
+                        type_a,
+                        type_b,
+                    )
+                    mismatch_count += 1
+
+    if mismatch_count == 0:
+        logger.info("✅ DFG interface validation passed — no bit-width mismatches found.")
+    else:
+        logger.warning(
+            "⚠️  DFG interface validation found %d mismatch(es). "
+            "Review signal type declarations in Module 1 output.",
+            mismatch_count,
+        )

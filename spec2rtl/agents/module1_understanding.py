@@ -306,7 +306,7 @@ class UnderstandingModule:
         
         prompt = template.render(
             decomposition_plan_json=plan.model_dump_json(indent=2),
-            info_dict_json=current_dict.model_dump_json(indent=2),
+            info_dict_json=info_dict.model_dump_json(indent=2),
             target_sub_function_name=info_dict.sub_function_name,
             original_spec_text=original_text[:8000],
             summaries_json=summaries_json,
@@ -317,3 +317,4 @@ class UnderstandingModule:
             {"role": "user", "content": prompt},
         ]
         return self._llm.generate(messages, StructuredInfoDict)
+

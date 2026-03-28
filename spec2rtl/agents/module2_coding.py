@@ -12,6 +12,7 @@ enabling cross-level code referencing as specified in the architecture.
 
 import json
 import logging
+import re
 import subprocess
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -38,6 +39,10 @@ _jinja_env = Environment(
     loader=FileSystemLoader(str(_PROMPTS_DIR)),
     keep_trailing_newline=True,
 )
+
+# Feature flag: if True, pass full function bodies in cross-function context.
+# Set to False (default) to only pass signatures and prevent context ballooning.
+INCLUDE_FULL_BODY_IN_CONTEXT: bool = False
 
 # Compiler-specific rule sets for C++ code generation
 # Note: rst_n should only be added for sequential designs, not combinational
@@ -136,8 +141,14 @@ class ProgressiveCodingModule:
             result.python_code = self._generate_python(
                 result.pseudocode, previous_python
             )
-            previous_python += f"\n# --- {info_dict.sub_function_name} ---\n"
-            previous_python += result.python_code.python_code
+            # Append only function signatures to avoid context ballooning (Phase 3.1)
+            if INCLUDE_FULL_BODY_IN_CONTEXT:
+                previous_python += f"\n# --- {info_dict.sub_function_name} ---\n"
+                previous_python += result.python_code.python_code
+            else:
+                sigs = _extract_python_signatures(result.python_code.python_code)
+                previous_python += f"\n# --- {info_dict.sub_function_name} (interface) ---\n"
+                previous_python += sigs
 
             # Step 3: C++ HLS code (with cross-level context)
             result.cpp_code = self._generate_cpp(
@@ -150,8 +161,14 @@ class ProgressiveCodingModule:
                     result.cpp_code.cpp_code
                 )
 
-            previous_cpp += f"\n// --- {info_dict.sub_function_name} ---\n"
-            previous_cpp += result.cpp_code.cpp_code
+            # Append only C++ function signatures (Phase 3.1)
+            if INCLUDE_FULL_BODY_IN_CONTEXT:
+                previous_cpp += f"\n// --- {info_dict.sub_function_name} ---\n"
+                previous_cpp += result.cpp_code.cpp_code
+            else:
+                sigs = _extract_cpp_signatures(result.cpp_code.cpp_code)
+                previous_cpp += f"\n// --- {info_dict.sub_function_name} (interface) ---\n"
+                previous_cpp += sigs
 
             # Step 4: Testbench generation
             result.testbench = self._generate_testbench(
@@ -394,3 +411,62 @@ class ProgressiveCodingModule:
             {"role": "user", "content": user_prompt},
         ]
         return self._llm.generate(messages, CppCorrection)
+
+
+# ──────────────────────────────────────────────────────────────
+# Signature extraction helpers (Phase 3.1)
+# ──────────────────────────────────────────────────────────────
+
+# Matches C++ function signatures: optional return type + name + params
+# Intentionally does NOT match bodies — stops at '{' or ';'
+_CPP_SIG_PATTERN = re.compile(
+    r"^[ \t]*(?:(?:inline|static|extern|virtual|constexpr)\s+)?"
+    r"(?:[\w:<>*& ]+\s+)?(?P<name>\w+)\s*\([^)]*\)\s*(?:const\s*)?\s*(?=[{;])",
+    re.MULTILINE,
+)
+
+# Matches Python 'def' lines only (no body)
+_PY_SIG_PATTERN = re.compile(
+    r"^[ \t]*(?:async\s+)?def\s+\w+\s*\([^)]*\).*?:",
+    re.MULTILINE,
+)
+
+
+def _extract_cpp_signatures(code: str) -> str:
+    """Extract C++ function prototype lines (no bodies) from a code block.
+
+    Used to pass only the interface of previously generated sub-functions
+    into the LLM context, preventing context window saturation.
+
+    Args:
+        code: Full C++ source code string.
+
+    Returns:
+        Newline-joined string of function signature lines.
+    """
+    matches = _CPP_SIG_PATTERN.findall(code)
+    # Re-extract the full matching lines (findall returns only named groups)
+    sigs: list[str] = []
+    for m in _CPP_SIG_PATTERN.finditer(code):
+        line = m.group(0).rstrip(" {;")
+        sigs.append(line.strip() + ";")
+    result = "\n".join(sigs) if sigs else "// (no signatures found)"
+    logger.debug("Extracted %d C++ signatures for context", len(sigs))
+    return result
+
+
+def _extract_python_signatures(code: str) -> str:
+    """Extract Python function 'def' header lines (no bodies) from a code block.
+
+    Args:
+        code: Python source code string.
+
+    Returns:
+        Newline-joined string of def header lines (ending with '...').
+    """
+    sigs: list[str] = []
+    for m in _PY_SIG_PATTERN.finditer(code):
+        sigs.append(m.group(0).strip() + " ...")
+    result = "\n".join(sigs) if sigs else "# (no signatures found)"
+    logger.debug("Extracted %d Python signatures for context", len(sigs))
+    return result

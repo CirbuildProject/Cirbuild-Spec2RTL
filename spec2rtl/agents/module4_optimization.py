@@ -16,6 +16,7 @@ from typing import Optional
 
 from jinja2 import Environment, FileSystemLoader
 
+from spec2rtl.agents.module2_coding import ProgressiveCodingModule
 from spec2rtl.config.settings import Spec2RTLSettings
 from spec2rtl.core.data_models import CppHlsTarget, HLSSynthesisResult, HLSConstraints
 from spec2rtl.core.exceptions import HLSSynthesisFailedError, PipelineStageError
@@ -24,6 +25,7 @@ from spec2rtl.hls.base import AbstractHLSTool
 from spec2rtl.hls.xls import XLSHLSTool
 from spec2rtl.llm.llm_client import LLMClient
 from spec2rtl.utils.code_utils import write_to_build_dir
+from spec2rtl.utils.hls_formatter import apply_deterministic_formatting
 
 logger = logging.getLogger("spec2rtl.agents.module4")
 
@@ -101,6 +103,7 @@ class OptimizationModule:
         module_name: str,
         build_dir: Path | None = None,
         is_combinational: bool = True,
+        top_func_name: str | None = None,
     ) -> HLSSynthesisResult:
         """Execute the full Module 4 pipeline.
 
@@ -129,6 +132,21 @@ class OptimizationModule:
 
         for attempt in range(1, self._settings.max_reflection_cycles + 1):
             
+            # Stage 0: Deterministic HLS formatting (Phase 2.1)
+            # Applied BEFORE the LLM optimizer to handle mechanical formatting
+            # without risk of hallucination or logic drift.
+            logger.info(
+                "🔧 Module 4 — Applying deterministic HLS formatting (Attempt %d)...",
+                attempt,
+            )
+            formatted_cpp = apply_deterministic_formatting(
+                code=current_cpp_code,
+                compiler_key=self._settings.hls_compiler,
+                top_func_name=top_func_name or safe_name,
+                enable_loop_pragmas=True,
+                enable_type_swap=True,
+            )
+
             # Stage 1: Optimize C++ for the active compiler (using current constraints)
             if attempt == 1:
                 logger.info(
@@ -141,7 +159,36 @@ class OptimizationModule:
                     attempt
                 )
             
-            optimized = self._optimize_for_compiler(current_cpp_code, current_constraints, is_combinational)
+            optimized = self._optimize_for_compiler(formatted_cpp, current_constraints, is_combinational)
+
+            # Stage 1.5: Post-optimization syntax check (Phase 2.3)
+            # Write temporarily to a check file, verify with g++ before synthesis.
+            check_path = write_to_build_dir(
+                content=optimized.cpp_code,
+                filename=f"{safe_name}_opt_check_att{attempt}.cpp",
+                build_root=output_dir,
+            )
+            syntax_status = ProgressiveCodingModule.syntax_check(check_path)
+            if syntax_status != "SUCCESS":
+                logger.warning(
+                    "❌ Module 4 post-optimization syntax check failed (Attempt %d): %s",
+                    attempt,
+                    syntax_status[:300],
+                )
+                # Route back through Module 4.5 HLS Reflection with syntax error
+                fixed_cpp, current_constraints = hls_reflector.recover(
+                    cpp_code=optimized.cpp_code,
+                    error_log=syntax_status,
+                    target_compiler=self._hls_tool.tool_name,
+                    current_constraints=current_constraints,
+                )
+                current_cpp_code = fixed_cpp
+                continue  # Retry this attempt with corrected code
+            else:
+                logger.info(
+                    "✅ Module 4 post-optimization syntax check passed (Attempt %d).",
+                    attempt,
+                )
 
             # Write optimized code to build directory
             cpp_path = write_to_build_dir(

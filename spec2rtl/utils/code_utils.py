@@ -119,3 +119,31 @@ def write_to_build_dir(
 
     logger.info("Wrote %s to %s", filename, run_dir)
     return output_path
+
+
+def clean_llm_json(raw_response: str) -> str:
+    """Strips Markdown code block formatting from LLM JSON responses.
+
+    Some models (e.g., Minimax) wrap valid JSON in ```json ... ``` fences,
+    causing Pydantic `model_validate_json` to fail. This function removes
+    those fences so the underlying JSON can be parsed cleanly.
+
+    Called at the Pydantic validation boundary in LLMClient.generate()
+    to prevent JSONSchemaValidationError retries and API credit waste.
+
+    Args:
+        raw_response: The raw string content from the LLM response.
+
+    Returns:
+        The cleaned JSON string with markdown fences stripped.
+    """
+    clean_str = raw_response.strip()
+    if clean_str.startswith("```json"):
+        clean_str = clean_str[7:]
+    elif clean_str.startswith("```"):
+        clean_str = clean_str[3:]
+
+    if clean_str.endswith("```"):
+        clean_str = clean_str[:-3]
+
+    return clean_str.strip()

@@ -26,6 +26,7 @@ from pydantic import BaseModel
 
 from spec2rtl.config.settings import Spec2RTLSettings
 from spec2rtl.core.exceptions import LLMFormattingError, LLMRateLimitError
+from spec2rtl.utils.code_utils import clean_llm_json
 
 logger = logging.getLogger("spec2rtl.llm.llm_client")
 
@@ -172,6 +173,7 @@ class LLMClient:
                         response_format=response_format,
                     )
                     content = response.choices[0].message.content
+                    content = clean_llm_json(content)
                     result = response_format.model_validate_json(content)
 
                     logger.debug(

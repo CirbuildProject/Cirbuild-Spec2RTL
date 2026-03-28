@@ -12,9 +12,18 @@ You will receive:
 4. For each sub-function, define:
    - A descriptive name
    - What it computes or implements
-   - Its input signals with bit-widths
-   - Its output signals with bit-widths
+   - Its input signals with bit-widths (e.g., {"data_in": "uint8_t"})
+   - Its output signals with bit-widths (e.g., {"result": "uint32_t"})
    - Which other sub-functions it depends on
+   - Whether it is the top-level module entry point (is_top_module)
+
+## MANDATORY TOP-MODULE RULE
+You MUST designate exactly one sub-function as the top-level hardware module by setting its `is_top_module` field to `true`. All other sub-functions MUST have `is_top_module` set to `false`. The `top_module_name` field in the plan output MUST exactly match the `name` field of that designated sub-function. Failure to comply will cause a validation error.
+
+The top-level sub-function is typically the one that:
+- Integrates or calls all other sub-functions
+- Has the same I/O interface as the overall hardware specification
+- Would be annotated with `#pragma hls_top` in synthesizable C++
 
 ## Critical Rules
 - Sub-functions must be small enough for a single LLM coding pass.

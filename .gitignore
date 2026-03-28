@@ -21,4 +21,6 @@ env/
 Verilog_sample/
 clean_prompt_spec2rtl.txt
 clean_codebase_spec2rtl.txt
+SPEC2RTL_ARCHITECTURE_FIX.md
+SPEC2RTL_CRITICAL_PATCH_01.md
 
