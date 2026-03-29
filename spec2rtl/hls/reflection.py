@@ -10,8 +10,6 @@ Now includes integration with Agentic Memory for persistent learning.
 import logging
 from pathlib import Path
 
-from autogen_agentchat.agents import AssistantAgent
-
 from spec2rtl.config.settings import Spec2RTLSettings
 from spec2rtl.core.data_models import HLSConstraints, HLSRecoveryPlan
 from spec2rtl.llm.llm_client import LLMClient
