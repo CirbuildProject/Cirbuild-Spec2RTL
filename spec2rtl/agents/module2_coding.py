@@ -54,15 +54,18 @@ _COMPILER_RULES: Dict[str, str] = {
 3. Use exactly one `#pragma hls_top` before the top-level evaluation function.
 4. NO SYSTEM HEADERS: DO NOT use ANY #include directives (NO #include <cstdint>).
 5. Use native C++ built-in types: unsigned char (8-bit), unsigned short (16-bit), unsigned int (32-bit), bool.
-6. Only add rst_n (active-low reset) for SEQUENTIAL designs with registers.
-7. For COMBINATIONAL designs: NO clock, NO reset, NO rst_n.
-8. LOOP PRAGMAS: Precede combinational `for` loops with `#pragma hls_unroll yes`.
+6. For COMBINATIONAL designs: NO clock, NO reset, NO rst_n.
+7. LOOP PRAGMAS: Precede combinational `for` loops with `#pragma hls_unroll yes`.
+8. OUTPUT INTERFACE RULE: DO NOT return a struct by value. If a module has multiple outputs, pass them as pointers or references in the function signature (e.g., void TopModule(..., bool* flush, uint32_t* new_pc)).
+9. PORT NAME RULE: Use EXACTLY the port names and reset polarities defined in the JSON plan. Do not invent signal names like rst_n if rst is requested in the inputs.
 """,
     "vitis": """
 [VITIS HLS SPECIFIC RULES]
 1. Use standard Xilinx Vitis HLS libraries. #include "ap_int.h" and use ap_uint/ap_int types.
 2. Apply appropriate #pragma HLS INTERFACE and #pragma HLS PIPELINE directives.
 3. Use standard C++ libraries like <cstdint> (uint8_t, uint16_t, bool).
+4. OUTPUT INTERFACE RULE: DO NOT return a struct by value. If a module has multiple outputs, pass them as pointers or references in the function signature (e.g., void TopModule(..., bool* flush, uint32_t* new_pc)).
+5. PORT NAME RULE: Use EXACTLY the port names and reset polarities defined in the JSON plan. Do not invent signal names like rst_n if rst is requested in the inputs.
 """,
 }
 
@@ -347,9 +350,9 @@ class ProgressiveCodingModule:
         binary_path = build_dir / f"{cpp_path.stem}_tb_bin"
         
         try:
-            # 1. Compile C++ and Testbench together
+            # 1. Compile Testbench (which #includes the implementation file)
             subprocess.run(
-                ["g++", str(cpp_path), str(tb_path), "-o", str(binary_path)],
+                ["g++", str(tb_path), "-o", str(binary_path)],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -378,6 +381,7 @@ class ProgressiveCodingModule:
         bad_code: str,
         error_log: str,
         target_compiler: str,
+        bad_testbench: Optional[str] = None,
     ) -> CppCorrection:
         """Use the reflection loop to fix a compilation error.
 
@@ -385,6 +389,7 @@ class ProgressiveCodingModule:
             bad_code: The C++ code that failed compilation.
             error_log: The compiler error output.
             target_compiler: Target HLS compiler name.
+            bad_testbench: The testbench code that was used, if available.
 
         Returns:
             A CppCorrection with the fixed code and explanation.
@@ -398,11 +403,16 @@ class ProgressiveCodingModule:
             f"You are an expert {target_compiler} C++ debugging agent.\n\n"
             f"CRITICAL STRICT RULES:\n{rules}\n"
             "- DO NOT include ANY comments. Provide ONLY the raw logic.\n"
-            "- Output as a JSON string. Escape newlines as \\\\n."
+            "- Output as a JSON string. Escape newlines as \\\\n.\n"
+            "- If the compiler error originates from the testbench logic, provide the corrected testbench code in the fixed_testbench_code JSON field."
         )
         user_prompt = (
             f"The following C++ HLS code failed to compile.\n\n"
             f"[CODE]\n{bad_code}\n\n"
+        )
+        if bad_testbench:
+            user_prompt += f"Here is the Testbench code that was used:\n[TESTBENCH]\n{bad_testbench}\n\n"
+        user_prompt += (
             f"[COMPILER ERROR LOG]\n{error_log}\n\n"
             "Fix the errors and provide the corrected C++ code."
         )

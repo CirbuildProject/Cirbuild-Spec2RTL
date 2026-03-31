@@ -143,6 +143,29 @@ class Spec2RTLPipeline:
             top_func_name=top_func_name,
         )
 
+        # ── Post-Synthesis Port Verification (Directive 7) ──
+        if synthesis_result.success:
+            port_error = self._verify_post_synthesis_ports(synthesis_result, plan)
+            if port_error:
+                logger.warning("🔄 Post-synthesis port mismatch detected — attempting retry with corrected C++.")
+                # Use the existing reflection infrastructure to fix the C++
+                correction = self._module2.fix_compilation_error(
+                    final_cpp, port_error, compiler
+                )
+                final_cpp = clean_llm_code_output(correction.fixed_cpp_code)
+                synthesis_result = self._module4.run(
+                    cpp_code=final_cpp,
+                    module_name=module_name,
+                    build_dir=self._settings.build_dir,
+                    is_combinational=is_combinational,
+                    top_func_name=top_func_name,
+                )
+                if synthesis_result.success:
+                    # Re-verify after retry
+                    port_error_2 = self._verify_post_synthesis_ports(synthesis_result, plan)
+                    if port_error_2:
+                        logger.error("Port verification still failing after retry: %s", port_error_2)
+
         if synthesis_result.success:
             logger.info("🎉 Pipeline complete! RTL: %s", synthesis_result.rtl_output_path)
         else:
@@ -189,13 +212,36 @@ class Spec2RTLPipeline:
             "combinational",
         ]
         
-        return self._module4.run(
+        synthesis_result = self._module4.run(
             cpp_code=final_cpp,
             module_name=plan.module_name,
             build_dir=self._settings.build_dir,
             is_combinational=is_combinational,
             top_func_name=top_func_name,
         )
+
+        # ── Post-Synthesis Port Verification (Directive 7) ──
+        if synthesis_result.success:
+            port_error = self._verify_post_synthesis_ports(synthesis_result, plan)
+            if port_error:
+                logger.warning("🔄 Post-synthesis port mismatch detected — attempting retry with corrected C++.")
+                correction = self._module2.fix_compilation_error(
+                    final_cpp, port_error, compiler
+                )
+                final_cpp = clean_llm_code_output(correction.fixed_cpp_code)
+                synthesis_result = self._module4.run(
+                    cpp_code=final_cpp,
+                    module_name=plan.module_name,
+                    build_dir=self._settings.build_dir,
+                    is_combinational=is_combinational,
+                    top_func_name=top_func_name,
+                )
+                if synthesis_result.success:
+                    port_error_2 = self._verify_post_synthesis_ports(synthesis_result, plan)
+                    if port_error_2:
+                        logger.error("Port verification still failing after retry: %s", port_error_2)
+
+        return synthesis_result
 
     def run_from_json(
         self,
@@ -291,7 +337,7 @@ class Spec2RTLPipeline:
             # Write C++ to disk for syntax check
             tmp_path = write_to_build_dir(
                 content=cpp_code,
-                filename=f"{result.name}_check.cpp",
+                filename=f"{result.name}_hls.cpp",
                 build_root=build_dir,
             )
             status = ProgressiveCodingModule.syntax_check(tmp_path)
@@ -356,15 +402,18 @@ class Spec2RTLPipeline:
                 decision = self._module3.analyze_and_decide(trajectory)
 
                 if decision.chosen_path == ReflectionPath.RETRY_CURRENT:
+                    current_tb = result.testbench.testbench_code if result.testbench else None
                     correction = self._module2.fix_compilation_error(
-                        cpp_code, status, compiler
+                        cpp_code, status, compiler, current_tb
                     )
                     cpp_code = clean_llm_code_output(correction.fixed_cpp_code)
                     result.cpp_code.cpp_code = cpp_code
+                    if correction.fixed_testbench_code and result.testbench:
+                        result.testbench.testbench_code = clean_llm_code_output(correction.fixed_testbench_code)
 
                     tmp_path = write_to_build_dir(
                         content=cpp_code,
-                        filename=f"{result.name}_check.cpp",
+                        filename=f"{result.name}_hls.cpp",
                         build_root=build_dir,
                     )
                     status = ProgressiveCodingModule.syntax_check(tmp_path)
@@ -413,14 +462,17 @@ class Spec2RTLPipeline:
                         "🔄 PATH_1: Revising specification understanding for %s",
                         result.name,
                     )
+                    current_tb = result.testbench.testbench_code if result.testbench else None
                     correction = self._module2.fix_compilation_error(
-                        cpp_code, status, compiler
+                        cpp_code, status, compiler, current_tb
                     )
                     cpp_code = clean_llm_code_output(correction.fixed_cpp_code)
                     result.cpp_code.cpp_code = cpp_code
+                    if correction.fixed_testbench_code and result.testbench:
+                        result.testbench.testbench_code = clean_llm_code_output(correction.fixed_testbench_code)
                     tmp_path = write_to_build_dir(
                         content=cpp_code,
-                        filename=f"{result.name}_path1_check.cpp",
+                        filename=f"{result.name}_path1_hls.cpp",
                         build_root=build_dir,
                     )
                     status = ProgressiveCodingModule.syntax_check(tmp_path)
@@ -440,14 +492,17 @@ class Spec2RTLPipeline:
                         logger.info(
                             "Re-validating %d previous sub-functions", current_idx
                         )
+                    current_tb = result.testbench.testbench_code if result.testbench else None
                     correction = self._module2.fix_compilation_error(
-                        cpp_code, status, compiler
+                        cpp_code, status, compiler, current_tb
                     )
                     cpp_code = clean_llm_code_output(correction.fixed_cpp_code)
                     result.cpp_code.cpp_code = cpp_code
+                    if correction.fixed_testbench_code and result.testbench:
+                        result.testbench.testbench_code = clean_llm_code_output(correction.fixed_testbench_code)
                     tmp_path = write_to_build_dir(
                         content=cpp_code,
-                        filename=f"{result.name}_path2_check.cpp",
+                        filename=f"{result.name}_path2_hls.cpp",
                         build_root=build_dir,
                     )
                     status = ProgressiveCodingModule.syntax_check(tmp_path)
@@ -579,6 +634,92 @@ class Spec2RTLPipeline:
         # Resolve a single top function name for downstream use
         resolved_top_name = next(iter(top_module_set)) if top_module_set else safe_name_fallback
         return combined, resolved_top_name
+
+    @staticmethod
+    def _verify_post_synthesis_ports(
+        synthesis_result: "HLSSynthesisResult",
+        plan: DecompositionPlan,
+    ) -> Optional[str]:
+        """Verify that generated Verilog ports match the specification.
+
+        Parses the module declaration from the synthesized .v file and
+        compares the port list against DecompositionPlan.inputs_outputs.
+        Detects collapsed output buses (e.g., 'out [71:0]') that indicate
+        the HLS compiler flattened a multi-port interface.
+
+        Args:
+            synthesis_result: The result from Module 4 synthesis.
+            plan: The DecompositionPlan with expected I/O definitions.
+
+        Returns:
+            An error message string if a severe mismatch is detected,
+            None if ports match or verification cannot be performed.
+        """
+        import re
+
+        if not synthesis_result.success or not synthesis_result.rtl_output_path:
+            return None
+
+        rtl_path = Path(synthesis_result.rtl_output_path)
+        if not rtl_path.exists():
+            logger.warning("Port verification skipped: RTL file not found at %s", rtl_path)
+            return None
+
+        rtl_content = rtl_path.read_text(encoding="utf-8")
+
+        # Extract module declaration: module <name> ( ... );
+        module_match = re.search(
+            r"module\s+\w+\s*\((.*?)\)\s*;",
+            rtl_content,
+            re.DOTALL,
+        )
+        if not module_match:
+            logger.warning("Port verification: could not parse module declaration from %s", rtl_path.name)
+            return None
+
+        port_section = module_match.group(1)
+        # Extract individual port names (handles input/output/inout declarations)
+        actual_ports = re.findall(
+            r"(?:input|output|inout)\s+(?:\[[\d:]+\]\s+)?(\w+)",
+            port_section,
+        )
+
+        # Build expected port set from the plan
+        expected_ports: set[str] = set()
+        for sf in plan.sub_functions:
+            expected_ports.update(sf.inputs.keys())
+            expected_ports.update(sf.outputs.keys())
+
+        # Detect collapsed output buses (e.g., 'out [71:0]' from struct flattening)
+        collapsed_buses = re.findall(
+            r"output\s+\[(\d+):\s*0\]\s+(\w+)",
+            port_section,
+        )
+        for msb, name in collapsed_buses:
+            if int(msb) > 32:  # Suspiciously wide bus likely from struct collapse
+                error_msg = (
+                    f"HLS collapsed the ports: detected wide output bus '{name} [{msb}:0]' "
+                    f"which indicates struct flattening. "
+                    f"Rewrite the C++ to use pass-by-reference/pointers for all outputs "
+                    f"instead of returning a struct."
+                )
+                logger.error("Port verification FAILED: %s", error_msg)
+                return error_msg
+
+        # Check for missing expected ports
+        actual_set = set(actual_ports)
+        missing = expected_ports - actual_set
+        if missing:
+            error_msg = (
+                f"Port verification mismatch: expected ports {missing} not found in generated RTL. "
+                f"Actual ports: {actual_set}. "
+                f"Rewrite the C++ to use pass-by-reference/pointers for all outputs."
+            )
+            logger.error("Port verification FAILED: %s", error_msg)
+            return error_msg
+
+        logger.info("Port verification PASSED: %d ports match specification.", len(actual_set))
+        return None
 
 
 def _ensure_toppragma(code: str) -> str:

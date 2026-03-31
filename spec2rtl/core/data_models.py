@@ -228,6 +228,10 @@ class CppCorrection(BaseModel):
     fixed_cpp_code: str = Field(
         description="The corrected C++ code.",
     )
+    fixed_testbench_code: Optional[str] = Field(
+        default=None,
+        description="The corrected testbench code, if the error originated from the testbench.",
+    )
     explanation: str = Field(
         description="Brief explanation of what was fixed.",
     )

@@ -42,6 +42,8 @@ uint32_t result = (a_signed < b_signed) ? 1 : 0;
 7. Always encapsulate module state (registers/arrays) inside a C++ class or struct. DO NOT use global or static variables for hardware state.
 8. Use C++ templates for scalable logic rather than hardcoding arrays.
 9. HEADER GUARDS: Wrap the entire C++ code in standard include guards.
+10. OUTPUT INTERFACE RULE: DO NOT return a struct by value. If a module has multiple outputs, pass them as pointers or references in the function signature (e.g., void TopModule(..., bool* flush, uint32_t* new_pc)).
+11. BIT-VECTOR LITERALS: You must explicitly convert Verilog bit-literals (e.g., 6'b011111) into their exact C++ hexadecimal or decimal equivalents (e.g., 0x1F or 31). Never replace explicit bit patterns with arbitrary integer states.
 
 ## STRICT JSON Output Format
 Respond with ONLY valid JSON. No markdown, no explanations, no conversational text.
