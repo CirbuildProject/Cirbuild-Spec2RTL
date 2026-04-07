@@ -326,12 +326,16 @@ Please include: relevant `.log` files, your `.env` configuration (redact API key
 
 ---
 
-## 🔮 Future Work
+## 🔮 Future Work & Architectural Pivots
 
-- **CirbuildSTG Integration:** Full operation as a live subsystem module within the CirbuildSTG ecosystem
-- **Vitis HLS Backend:** Synthesis runner for Xilinx Vitis (type mapping and deterministic formatting already complete)
-- **Advisor / Supervisor Agent:** Human-in-the-loop intercept for high-complexity or unresolvable errors — intended as a learning platform for IC design students
-- **GUI:** Streamlit or Gradio front-end with NL scripting translator
+- **Direct SystemVerilog Generation (HLS Deprecation Track):** Pivoting the primary educational pipeline away from High-Level Synthesis (e.g., Google XLS/Vitis) to direct SystemVerilog generation. HLS produces highly optimized but unreadable gate-level netlists, which violates the core product definition of providing human-readable, deterministic baselines for students. 
+- **Concentric "Fast-Fail" Verification Loops:** Replacing monolithic verification passes with escalating computational loops to save LLM context windows and drastically reduce latency:
+  - *Inner Loop (Milliseconds):* Syntax and semantic checks using ultra-fast linters (**Verible** or **Slang**).
+  - *Middle Loop (Seconds):* Functional verification via Hardware Test-Driven Development (TDD) using **Cocotb** and **Verilator/Icarus**.
+  - *Outer Loop (Minutes):* Physical design and timing constraints pushed to **Librelane** (Yosys/OpenROAD) only after logical verification passes.
+- **Deterministic Testbench Harness (Echo-Chamber Prevention):** Engineer a strict, multi-stage prompt harness for the `cocotb` testbench agent. To prevent the LLM from generating flawed RTL and a flawed testbench that agrees with it, the pipeline will strictly separate intent extraction (JSON I/O mapping -> English logical invariants) from the final Python assertion generation.
+- **CirbuildSTG Integration:** Full operation as a live subsystem module within the CirbuildSTG ecosystem.
+- **Advisor / Supervisor Agent:** Human-in-the-loop intercept for high-complexity or unresolvable errors — intended as a learning platform for IC design students to manually unblock the agent.
 
 ---
 
